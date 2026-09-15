@@ -16,6 +16,8 @@ sheets: Start here, Login, Chat, Dashboard, Live updates; last reviewed 2026-09-
 
 ## Structure decisions
 
+- Redux slices so far: `auth`, `connectivity`. `bootstrap`, `dashboard`, `conversations`, `messages`,
+  `templates` and `presence` are registered in `src/store/rootReducer.ts` in their own stages.
 - **Routes live in `src/app/`** (Expo Router convention for SDK 57). Because every file in
   `src/app/` is treated as a route, the Redux store and typed hooks live in **`src/store/`**
   (`store.ts`, `hooks.ts`) instead of `src/app/`.
@@ -24,6 +26,38 @@ sheets: Start here, Login, Chat, Dashboard, Live updates; last reviewed 2026-09-
   Axios is imported only in `src/api/network.ts`.
 - Socket client isolated in `src/services/socket/`; the rest of the app depends on an
   app-level interface, not the Pusher/Reverb library.
+
+## Network & session architecture (Stage 3)
+
+```
+Screen / component
+   └─ Redux thunk / feature hook        src/features/*/…Thunks.ts
+        └─ src/api/apis.ts              typed endpoint functions
+             └─ src/api/network.ts      the only axios importer (lint-enforced)
+                  └─ Laravel API
+```
+
+- **Tokens**: `src/services/storage/tokenStorage.ts` — SecureStore (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`),
+  separate keys per token (iOS ~2 KB value limit), in-memory cache, refresh token written first.
+- **Refresh**: single-flight lock; proactive when the access token is within 30 s of `expires_in`;
+  on 401 the request is retried once. A request that failed with an already-rotated token reuses the
+  new token instead of refreshing again (a second refresh would send a revoked refresh token).
+- **Session expiry**: only when refresh is *rejected* (401/403/422…). Network errors, timeouts, 5xx
+  and 429 keep the session. Expiry clears SecureStore → emits `sessionEvents.expired` → Redux
+  listener clears private AsyncStorage + registered services (socket later) → `app/reset` →
+  `auth.sessionExpired = true`.
+- **Logout**: best-effort `POST /auth/logout` with `skipAuthRefresh`, then the same local cleanup.
+- **Credentials never leave the Wazigo origin**: absolute URLs to other hosts get no bearer token;
+  `network.authorizedRequest()` refuses them (media downloads, socket auth).
+- **Offline**: requests short-circuit with `code: 'OFFLINE'` when NetInfo reports `isConnected === false`.
+- **Errors**: always `ApiError {status, code, message, errors?, retryAfterSeconds?, isNetworkError?, isOffline?, isTimeout?}`.
+  5xx never surfaces raw server text.
+- **Logging (dev only)**: method, path without query string, status, duration. No headers or bodies.
+- **Lint guards**: `axios` only in `network.ts`; `expo-secure-store` only in `tokenStorage.ts`;
+  AsyncStorage only in `appStorage.ts`.
+- **Tests**: `npm test` — network layer against a local HTTP server (concurrent 401 → one refresh,
+  proactive refresh, expiry without loops, transient refresh failure, 422/429/403, offline, foreign
+  host) and Redux session handling (sign-in persistence, logout cleanup, expiry reset).
 
 ## Design reference (received 2026-09-15)
 
@@ -124,8 +158,8 @@ Errors: `{status:false, message, errors?}`.
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
-2. Branding assets, Poppins, theme / design system ← **current**
-3. `network.ts`, `endpoints.ts`, `apis.ts`, Redux, storage, token management
+2. Branding assets, Poppins, theme / design system ✔
+3. `network.ts`, `endpoints.ts`, `apis.ts`, Redux, storage, token management ✔
 4. Splash, Login (OTP + password), OTP verification
 5. `/me/bootstrap`, permissions, session restore
 6. Personal dashboard

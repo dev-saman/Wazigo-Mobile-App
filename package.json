@@ -9,6 +9,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "12.0.1",
     "@reduxjs/toolkit": "^2.12.0",
+    "@types/jest": "29.5.14",
     "axios": "^1.20.0",
     "expo": "~57.0.22",
     "expo-constants": "~57.0.18",
@@ -23,6 +24,8 @@
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
+    "jest": "~29.7.0",
+    "jest-expo": "~57.0.5",
     "react": "19.2.3",
     "react-hook-form": "^7.88.0",
     "react-native": "0.86.3",
@@ -35,6 +38,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/node": "^22.20.2",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
@@ -45,8 +49,19 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
-    "doctor": "npx expo-doctor"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "doctor": "npx expo-doctor",
+    "test": "jest"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@/assets/(.*)$": "<rootDir>/assets/$1",
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@reduxjs/toolkit|immer|redux|reselect|react-redux))"
+    ]
+  }
 }

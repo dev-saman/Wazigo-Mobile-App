@@ -3,11 +3,28 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider } from 'react-redux';
 
 import { Colors, FontAssets } from '@/constants/theme';
+import { useConnectivityMonitor } from '@/features/connectivity/useConnectivityMonitor';
+import { store } from '@/store/store';
 
 // Keep the native splash up until Poppins is ready so no system font flashes.
 SplashScreen.preventAutoHideAsync();
+
+function AppShell() {
+  useConnectivityMonitor();
+
+  // Auth/app route groups and session restore are added in Stages 4–5.
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: Colors.background },
+      }}
+    />
+  );
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(FontAssets);
@@ -20,15 +37,11 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
-  // Redux, session restore and the auth/app route groups are added in Stages 3–5.
   return (
-    <SafeAreaProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: Colors.background },
-        }}
-      />
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <AppShell />
+      </SafeAreaProvider>
+    </Provider>
   );
 }
