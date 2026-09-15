@@ -25,6 +25,31 @@ sheets: Start here, Login, Chat, Dashboard, Live updates; last reviewed 2026-09-
 - Socket client isolated in `src/services/socket/`; the rest of the app depends on an
   app-level interface, not the Pusher/Reverb library.
 
+## Design reference (received 2026-09-15)
+
+The Wazigo mobile design sheet (14 screens + brand colours + Poppins scale) sets layout,
+spacing, colours, typography, cards and chat appearance. Brand tokens taken from it:
+Deep Green `#00603A`, Vivid Green `#08B74F`, Soft Mint `#D8F8DE`, Mint Green `#25D366`,
+Deep Navy `#0F172A`.
+
+Design elements **intentionally not implemented** because the API / phase-1 scope does not
+support them:
+
+| Design element | Screen | Reason |
+| --- | --- | --- |
+| Continue with Google | Login | Only phone + OTP / password login |
+| Terms of Service / Privacy links | Login | No URLs supplied — add when provided |
+| 6-digit OTP boxes | OTP | Backend default is 5 digits; length stays configurable |
+| Templates / More tabs | Home, Chats | Mobile v1 tabs are Home + Chats only |
+| Pending replies, response rate, customer rating cards | Home | Not in DASH-01; use total / open / unread / window_open |
+| Recent conversations "See all" business list | Home | Dashboard must stay personal; chats live in the Chats tab |
+| "Awaiting" filter chip | Chats | No matching CHAT-01 filter; using All / Open / Unread / Priority |
+| Customer "Online" / last-seen | Conversation | No customer presence field in Conversation resource |
+| Call button | Conversation | No calling API |
+| Location, Contact attachments | Attachment sheet | CHAT-04 supports image / document / audio / video only |
+| Star, Mute, Archive, Report, Block actions | Conversation actions | No endpoints; using resolve / reopen / priority / labels / bot take-over |
+| Start a Conversation | Empty state | No outbound conversation creation in phase 1 |
+
 ## Endpoint map (verified against the workbook)
 
 | ID | Method + path | Notes |
@@ -80,8 +105,7 @@ Errors: `{status:false, message, errors?}`.
    `EXPO_PUBLIC_REVERB_APP_KEY`. Needed for Stage 13.
 3. **iOS bundle identifier / Android package name** — not set yet (store identities are
    permanent). Needed before the first native build.
-4. **Mobile design reference** — not found on this machine; logo PNGs were found in
-   `Downloads\Wazigo logo png`. Needed for Stage 2+.
+4. ~~Mobile design reference~~ — received 2026-09-15 (see above).
 5. **OTP length** — default is 5 digits but deployment-configurable, and no API returns the
    configured length. The OTP input will be built length-configurable (default 5).
 6. **tenant_id** — only available as a JWT claim (needed for channel names).
@@ -99,8 +123,8 @@ Errors: `{status:false, message, errors?}`.
 
 ## Stages
 
-1. Environment, Expo, Git, dependencies, base folders ← **current**
-2. Branding assets, Poppins, theme / design system
+1. Environment, Expo, Git, dependencies, base folders ✔
+2. Branding assets, Poppins, theme / design system ← **current**
 3. `network.ts`, `endpoints.ts`, `apis.ts`, Redux, storage, token management
 4. Splash, Login (OTP + password), OTP verification
 5. `/me/bootstrap`, permissions, session restore

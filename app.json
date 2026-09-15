@@ -8,13 +8,12 @@
     "scheme": "wazigo",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#08B74F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -24,9 +23,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#00603A",
+          "image": "./assets/branding/wazigo-app-icon.png",
+          "imageWidth": 88
         }
       ],
       "expo-secure-store"
@@ -38,6 +37,7 @@
     "platforms": [
       "ios",
       "android"
-    ]
+    ],
+    "backgroundColor": "#F6F8F7"
   }
 }

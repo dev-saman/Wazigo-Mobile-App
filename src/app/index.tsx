@@ -1,35 +1,35 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Config } from '@/constants/config';
+import { Button } from '@/components/common';
+import { Spacing } from '@/constants/theme';
+import { SplashView } from '@/features/auth/components/SplashView';
 
-// Temporary Stage 1 placeholder so the project boots. Replaced by the Splash
-// route in Stage 4.
+// Stage 2: static brand splash. Stage 4 adds session restore and routing to
+// Login or the app; the dev-only preview button is removed then.
 export default function Index() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Wazigo</Text>
-      <Text style={styles.caption}>Stage 1 setup — API: {Config.apiBaseUrl}</Text>
+    <View style={styles.flex}>
+      <SplashView busy={false} />
+      {__DEV__ ? (
+        <View style={[styles.dev, { bottom: insets.bottom + Spacing.lg }]}>
+          <Button
+            title="Open UI preview (dev only)"
+            variant="secondary"
+            size="sm"
+            fullWidth={false}
+            onPress={() => router.push('/ui-preview')}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#00603A',
-  },
-  caption: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#475467',
-    textAlign: 'center',
-  },
+  flex: { flex: 1 },
+  dev: { position: 'absolute', alignSelf: 'center' },
 });
