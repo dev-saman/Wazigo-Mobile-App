@@ -147,6 +147,9 @@ Errors: `{status:false, message, errors?}`.
    configured length. Built configurable: `Config.otpLength` (`EXPO_PUBLIC_OTP_LENGTH`, default 5,
    clamped 4-8). Confirm the deployed value during the first real login test.
 6. **tenant_id** — only available as a JWT claim (needed for channel names).
+7. **Live event names and payload shapes** — the Live updates sheet documents the channel and
+   `POST /broadcasting/auth`, but not what is broadcast on it. Without the event names and their
+   payloads there is nothing to map onto the Conversation and Message resources.
 
 ## Backend blockers (from workbook — none confirmed fixed)
 
@@ -210,8 +213,8 @@ src/app/
   (`dashboard.view` in Stage 6, `conversations.view` in Stage 7); `usePermission()` covers
   hiding an action such as send when `conversations.send` is missing.
 - `app/reset` clears the slice, so a second account never inherits the first one's permissions.
-- **Known limitation:** permissions are fetched once per session. A mid-session change on the
-  server is picked up on the next launch; a foreground re-fetch belongs with Stage 13.
+- ~~**Known limitation:** permissions are fetched once per session.~~ Closed in Stage 13: they are
+  re-fetched silently on foreground and on reconnect, at most every 5 minutes.
 
 ## Dashboard & tabs (Stage 6)
 
@@ -404,6 +407,44 @@ src/app/
   `network.test.ts`), alongside the existing 5xx case; timeouts are `isNetworkError`, so they are
   transient too.
 
+## Live updates and presence (Stage 13)
+
+**The socket is deliberately not connected.** Four things are missing and one is a hazard:
+
+| Missing | Effect |
+| --- | --- |
+| Reverb app key (`EXPO_PUBLIC_REVERB_APP_KEY`) | Cannot connect |
+| `/broadcasting/auth` location (`/api/v1` or site root) | Cannot authorize a private channel |
+| `tenant_id` (JWT claim only) | Cannot name the channel |
+| Event names + payload shapes (never documented) | Nothing to map an event onto |
+| **Blocker 5** | `private-tenant.<tenant>.number.<number>` carries other assignees' message content — subscribing would deliver it to a personal app |
+
+Guessing the event catalogue, or shipping a connect path for a channel the app must not join,
+would be unverifiable either way, so neither was written. What was built is the fallback that
+carries the app until those answers arrive, and presence.
+
+- `src/features/realtime/` — `isStale` (pure, tested) and `useLiveRefresh`. A screen refreshes on
+  app foreground and again when the device reconnects, but only once what it shows is older than
+  30 s (permissions: 5 minutes). Pull-to-refresh is unchanged.
+- **The refresh is quiet.** `loadConversations`, `loadThread` and `loadDashboard` take a flag that
+  skips the loading dispatch: a refresh nobody asked for must not blank a thread, drop a skeleton
+  over the chats list, or spin a `RefreshControl`. A failure keeps what is on screen and shows the
+  Stage 12 stale banner.
+- **It stands down once the user has paged** (`page > 1`): page 1 would replace rows or messages
+  they scrolled to. Pull-to-refresh remains theirs to choose.
+- **Permissions are no longer session-long.** `loadBootstrap({ silent: true })` re-fetches them
+  without the gate; a transient failure keeps the permissions in hand, while 403 (access taken
+  away) and 401 (dead session) are handled exactly as on first load. This closes the Stage 5
+  limitation.
+- `src/features/presence/` — CHAT-16 + CHAT-17: online while foregrounded, away on background, a
+  heartbeat every 60 s, nothing while offline, and a re-send of any status the server never
+  accepted. Every failure is swallowed; presence must never interrupt reading or sending. The
+  transport is injected, so the policy is tested without the network or React. No slice: nothing
+  in the design renders the agent's own presence.
+- **When the answers arrive**, the socket belongs behind `src/services/socket/` and an app-level
+  interface (no screen or slice may import the client), registered with `registerSessionCleanup`,
+  and gated so it cannot connect until blocker 5 is fixed. The REST fallback stays underneath it.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -418,13 +459,14 @@ src/app/
 10. Reply window + templates ✔
 11. Message states, retry, resolve/reopen, conversation actions ✔
 12. Offline, loading, session expired, access denied ✔
-13. Realtime (Reverb) architecture with REST fallback
+13. REST fallback (foreground / reconnect refresh) + presence ✔ — socket deferred, see above
 14. Cleanup, lint, Expo Doctor, README, backend blockers doc
 15. Commits + push
 
 ### Dependencies deferred until their stage (compatibility to be verified then)
 - Bottom sheet library (verify against Reanimated 4.5 / RN 0.86) — Stage 9/11
-- Pusher-compatible client for Reverb — Stage 13
+- Pusher-compatible client for Reverb — **still deferred past Stage 13**: no app key, no auth URL,
+  no event catalogue, and blocker 5 makes the documented channel unsafe to join
 - ~~`expo-file-system` for authenticated media download~~ — installed in Stage 9 (57.0.7)
 - FlashList (only if stable on SDK 57) — Stage 7
 - Date/time-zone utility — Stage 6
