@@ -50,6 +50,23 @@ backend yet.** All API behaviour so far is verified only against a local mock se
 
 ## 3. What exists
 
+### Routes as they stand now
+
+```
+src/app/_layout.tsx             restoreSession() + brand splash while status is "unknown",
+                                then <Stack.Protected> opens exactly one group
+  (auth)/login.tsx              /login   phone + OTP or password      (anchor)
+  (auth)/otp.tsx                /otp     code entry, resend countdown
+  (app)/_layout.tsx             BootstrapGate: nothing renders until AUTH-05 answers
+    (tabs)/index.tsx            /        dashboard (dashboard.view)
+    (tabs)/chats.tsx            /chats   conversation list (conversations.view)
+    chats/[id]/index.tsx        /chats/1 thread + composer (covers the tab bar)
+    chats/[id]/templates.tsx    /chats/1/templates   template picker + parameters
+```
+
+There is **no root `index.tsx`** on purpose: the tabs group owns `/`, so the splash renders from
+the root layout instead of a competing route.
+
 ### Branding & design system (Stage 2)
 - `assets/branding/` — 6 official PNGs (app icon, green/dark/white icon, dark/white wordmark),
   transparent padding trimmed only. Never re-create the logo with text.
@@ -87,18 +104,8 @@ Screen → feature thunk/hook → src/api/apis.ts → src/api/network.ts → Lar
   `signInWithPassword`, `restoreSession`, `signOut`, `handleSessionExpired`), selectors.
 - `src/features/connectivity/` — slice + `useConnectivityMonitor()` (mounted in the root layout).
 
-### Screens & routing (Stage 4)
+### Login & OTP (Stage 4)
 
-```
-src/app/_layout.tsx        restoreSession() + brand splash while status is "unknown",
-                           then <Stack.Protected> opens exactly one group
-src/app/(auth)/            login.tsx (/login), otp.tsx (/otp), anchor: login
-src/app/(app)/_layout.tsx  BootstrapGate (Stage 5) around the signed-in stack
-src/app/(app)/(tabs)/      index.tsx (/) dashboard, chats.tsx (/chats) placeholder
-```
-
-- There is **no root `index.tsx`** on purpose: the tabs group owns `/`, so the splash renders
-  from the root layout instead of a competing route.
 - `src/components/forms/` — `TextField`, `PhoneField` (fixed +91, groups as you type),
   `OtpInput` (boxes drawn under one invisible input, so OS paste/autofill and backspace work).
 - `src/features/auth/validation.ts` (react-hook-form + zod, one schema for both login modes),
@@ -120,12 +127,11 @@ src/app/(app)/(tabs)/      index.tsx (/) dashboard, chats.tsx (/chats) placehold
   same `SplashView` as launch, so cold start and login look like one continuous screen.
 - Only `user`, `roles`, `permissions`, `numbers` are read; the user from bootstrap replaces the
   slimmer one from login. 401 -> sign out, 403 -> Access Denied, offline/5xx -> retry in place.
-- `RequirePermission` and `usePermission()` are ready but not yet applied to a screen: Stage 6
-  gates the dashboard on `dashboard.view`, Stage 7 the chats list on `conversations.view`.
+- `RequirePermission` / `usePermission()` now gate the dashboard (`dashboard.view`), the chats list
+  and thread (`conversations.view`), the composer (`conversations.send`), templates
+  (`templates.view` / `templates.send`) and priority + labels (`conversations.tag`).
 - Permissions are fetched once per session; a mid-session change is only seen on relaunch
   (a foreground re-fetch belongs with Stage 13).
-- `(app)/index.tsx` is still a placeholder, but now lists the roles, number and permissions
-  bootstrap returned so Stage 5 can be checked on a device.
 
 ### Dashboard & tabs (Stage 6)
 
@@ -134,7 +140,7 @@ src/app/(app)/(tabs)/      index.tsx (/) dashboard, chats.tsx (/chats) placehold
   `src/components/dashboard/` — `MetricCard`, `StatRow`, `DashboardSkeleton`.
 - **Tabs come from `expo-router/js-tabs`**: `import { Tabs } from 'expo-router'` is deprecated in
   Expo Router 57, and `unstable-native-tabs` cannot carry Poppins labels or the brand greens.
-  Two tabs only (Home, Chats); `chats.tsx` is a placeholder until Stage 7.
+  Two tabs only (Home, Chats).
 - Home shows only DASH-01 fields: four totals, priority breakdown (urgent first, unknown values
   dropped), today's and the window's inbound/outbound with the busiest day, and delivery with the
   note that **delivered already includes read**. `totals.closed` is ignored on purpose.
@@ -160,7 +166,7 @@ src/app/(app)/(tabs)/      index.tsx (/) dashboard, chats.tsx (/chats) placehold
 
 ### Message thread (Stage 8)
 
-- `src/app/(app)/chats/[id].tsx` (sibling of `(tabs)`, so it covers the tab bar) +
+- `src/app/(app)/chats/[id]/index.tsx` (sibling of `(tabs)`, so it covers the tab bar) +
   `src/features/messages/` (state keyed by conversation id, `loadThread`, `loadOlderMessages`,
   and `threadRows.ts` for day grouping) + `MessageBubble`, `DaySeparator`, `ThreadHeader`.
 - **The header comes from CHAT-02's `meta.conversation`**; the tapped row is only the placeholder
@@ -247,6 +253,10 @@ src/app/(app)/(tabs)/      index.tsx (/) dashboard, chats.tsx (/chats) placehold
 5. **OTP length** — backend default 5, deployment-configurable, not exposed by any API. The input
    is built length-configurable (`EXPO_PUBLIC_OTP_LENGTH`, default 5); confirm the live value on
    the first real login.
+6. **Opening a document, playing a video or audio** — images download and display inline, but the
+   other types are only named. That needs a dependency nobody has chosen: `expo-sharing` to hand a
+   file to the OS, `expo-video` / `expo-audio` to play one. Native, so it must be decided before a
+   build, not after. Until then the bubble names the file rather than offering a button that fails.
 
 ## 6. Backend blockers (none fixed — see plan for detail)
 
@@ -287,7 +297,7 @@ npm run android    # emulator / device
 npm run ios        # macOS or Expo Go
 npm run lint
 npm run typecheck  # app + test tsconfigs
-npm test           # jest (13 tests)
+npm test           # jest (150 tests)
 npm run doctor     # expo-doctor
 ```
 
