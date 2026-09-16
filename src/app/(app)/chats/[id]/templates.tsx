@@ -41,6 +41,7 @@ import {
   type TemplateParamError,
 } from '@/features/templates';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { traceWriteIntent } from '@/utils/devTrace';
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -104,6 +105,7 @@ function TemplateForm({
     setErrors(found);
     if (found.length > 0) return;
 
+    traceWriteIntent('template send pressed', { conversationId, templateId: template.id });
     // Sent like any other message: the thread shows it pending, then sent or
     // failed, so this screen does not need to wait for the response.
     void dispatch(

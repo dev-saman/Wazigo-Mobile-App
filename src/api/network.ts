@@ -39,6 +39,8 @@ declare module 'axios' {
     _retried?: boolean;
     _tokenUsed?: string;
     _startedAt?: number;
+    /** Development only: where a write was issued from, for the write trace. */
+    _callerStack?: string;
   }
 }
 
@@ -85,6 +87,7 @@ const ERROR_CODES = new Set<ApiErrorCode>([
   'OFFLINE',
   'NETWORK',
   'CANCELLED',
+  'READ_ONLY',
   'UNKNOWN',
 ]);
 
@@ -147,6 +150,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   OFFLINE: "You're offline. Check your internet connection and try again.",
   NETWORK: 'Unable to reach Wazigo. Check your connection and try again.',
   CANCELLED: 'Request cancelled.',
+  READ_ONLY: 'Not sent: this development build is read-only against production.',
   UNKNOWN: 'Something went wrong. Please try again.',
 };
 
@@ -285,8 +289,30 @@ async function getValidAccessToken(): Promise<string | null> {
 // Interceptors
 // ---------------------------------------------------------------------------
 
+/**
+ * Every write a development build attempts is logged with a wall-clock time and
+ * the stack it was issued from, whether it is allowed or not. Timestamps line up
+ * with `adb logcat`, so a write can be tied to what was happening on the device.
+ */
+const traceWrite = (config: AxiosRequestConfig, outcome: 'allowed' | 'BLOCKED') => {
+  if (!__DEV__) return;
+  const method = (config.method ?? 'get').toUpperCase();
+  console.log(`[api:write] ${new Date().toISOString()} ${method} ${stripQuery(config.url)} ${outcome}`);
+  if (config._callerStack) console.log(`[api:write] issued from:
+${config._callerStack}`);
+};
+
 client.interceptors.request.use(async (config) => {
   config._startedAt = Date.now();
+
+  const isWrite = (config.method ?? 'get').toLowerCase() !== 'get';
+  if (isWrite) {
+    // Refresh is session maintenance, not a change to anyone's data; without
+    // it a read-only build could not even restore its session.
+    const blocked = Config.readOnly && !config._isRefresh;
+    traceWrite(config, blocked ? 'BLOCKED' : 'allowed');
+    if (blocked) throw makeError('READ_ONLY', DEFAULT_ERROR_MESSAGES.READ_ONLY);
+  }
 
   if (isOnline === false) {
     throw makeError('OFFLINE', DEFAULT_ERROR_MESSAGES.OFFLINE, { isOffline: true, isNetworkError: true });
@@ -368,8 +394,10 @@ async function send<T, M>(
   data: unknown,
   { envelope = true, ...options }: RequestOptions & { onUploadProgress?: (e: AxiosProgressEvent) => void } = {},
 ): Promise<ApiResponse<T, M>> {
+  // Captured before the first await, while the stack still shows the caller.
+  const _callerStack = __DEV__ && method.toLowerCase() !== 'get' ? new Error().stack : undefined;
   try {
-    const response = await client.request({ method, url, data, ...options });
+    const response = await client.request({ method, url, data, ...options, _callerStack });
     return unwrap<T, M>(response, envelope);
   } catch (error) {
     throw normalizeError(error);

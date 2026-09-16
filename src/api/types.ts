@@ -43,6 +43,8 @@ export type ApiErrorCode =
   | 'OFFLINE'
   | 'NETWORK'
   | 'CANCELLED'
+  /** A write refused locally because this development build is read-only. */
+  | 'READ_ONLY'
   | 'UNKNOWN';
 
 /** Normalized error. Screens never inspect raw Axios errors. */

@@ -56,6 +56,7 @@ import {
 import { useLiveRefresh } from '@/features/realtime';
 import { pickDocument, pickFromCamera, pickFromLibrary } from '@/services/media/picker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { traceWriteIntent } from '@/utils/devTrace';
 
 const Copy = {
   emptyTitle: 'No messages yet',
@@ -156,6 +157,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const onSend = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
+    traceWriteIntent('composer send pressed', { conversationId, length: text.length });
     setDraft('');
     void dispatch(sendText({ conversationId, text }));
   }, [conversationId, dispatch, draft]);
@@ -182,6 +184,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         }
 
         const caption = draft.trim();
+        traceWriteIntent('attachment send', { conversationId, type: result.type, captionLength: caption.length });
         setDraft('');
         void dispatch(sendMedia({ conversationId, type: result.type, file: result.file, caption }));
       } finally {
@@ -193,7 +196,8 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
 
   /** Every action answers with the Conversation, so nothing is refetched. */
   const runAction = useCallback(
-    async (action: () => Promise<unknown>) => {
+    async (name: string, action: () => Promise<unknown>) => {
+      traceWriteIntent(`conversation action: ${name}`, { conversationId });
       setActionBusy(true);
       try {
         await action();
@@ -204,11 +208,12 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         setActionBusy(false);
       }
     },
-    [],
+    [conversationId],
   );
 
   const onRetry = useCallback(
     (message: Message) => {
+      traceWriteIntent('retry pressed', { conversationId, messageId: message.id });
       setActionMessage(null);
       void dispatch(retryMessage({ conversationId, message }));
     },
@@ -351,9 +356,9 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         busy={actionBusy}
         offline={offline}
         onClose={() => setOpenSheet('none')}
-        onResolve={() => void runAction(() => dispatch(resolveConversation({ conversationId })).unwrap())}
-        onReopen={() => void runAction(() => dispatch(reopenConversation({ conversationId })).unwrap())}
-        onTakeOver={() => void runAction(() => dispatch(stopChatbot({ conversationId })).unwrap())}
+        onResolve={() => void runAction('resolve', () => dispatch(resolveConversation({ conversationId })).unwrap())}
+        onReopen={() => void runAction('reopen', () => dispatch(reopenConversation({ conversationId })).unwrap())}
+        onTakeOver={() => void runAction('take over', () => dispatch(stopChatbot({ conversationId })).unwrap())}
         onPriority={() => setOpenSheet('priority')}
         onLabels={() => {
           if (labelsStatus === 'idle' || labelsStatus === 'failed') void dispatch(loadLabels());
@@ -368,7 +373,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         offline={offline}
         onClose={() => setOpenSheet('conversation')}
         onSelect={(priority: ConversationPriority) =>
-          void runAction(() => dispatch(setConversationPriority({ conversationId, priority })).unwrap())
+          void runAction('priority', () => dispatch(setConversationPriority({ conversationId, priority })).unwrap())
         }
       />
 
@@ -382,7 +387,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         offline={offline}
         onClose={() => setOpenSheet('conversation')}
         onSave={(labelIds) =>
-          void runAction(() => dispatch(setConversationLabels({ conversationId, labelIds })).unwrap())
+          void runAction('labels', () => dispatch(setConversationLabels({ conversationId, labelIds })).unwrap())
         }
       />
       ) : null}

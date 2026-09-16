@@ -20,6 +20,7 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 let mockBaseUrl = '';
+let mockReadOnly = false;
 jest.mock('@/constants/config', () => ({
   get Config() {
     return {
@@ -28,6 +29,7 @@ jest.mock('@/constants/config', () => ({
       requestTimeoutMs: 2000,
       uploadTimeoutMs: 2000,
       enableNetworkLogging: false,
+      readOnly: mockReadOnly,
     };
   },
 }));
@@ -80,6 +82,7 @@ function load() {
 beforeEach(() => {
   hits.length = 0;
   mockSecureStore.clear();
+  mockReadOnly = false;
 });
 
 describe('network.ts', () => {
@@ -238,6 +241,51 @@ describe('network.ts', () => {
     network.setOnline(false);
     await expect(api.getConversations()).rejects.toMatchObject({ code: 'OFFLINE', isOffline: true });
     expect(hits).toHaveLength(1);
+  });
+
+  it('in read-only mode, refuses every write before it leaves the device', async () => {
+    const { tokenStorage, api } = load();
+    await tokenStorage.save('access-1', 'refresh-1', 3600);
+    mockReadOnly = true;
+    handler = (_req, _body, res) => ok(res, {});
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    // The exact request that reached production on 2026-09-16.
+    await expect(api.sendTextMessage(3, { text: 'hi' })).rejects.toMatchObject({ code: 'READ_ONLY' });
+    await expect(api.retryMessage(3, 99)).rejects.toMatchObject({ code: 'READ_ONLY' });
+    await expect(api.updatePresence({ status: 'online' })).rejects.toMatchObject({ code: 'READ_ONLY' });
+    await expect(api.resolveConversation(3)).rejects.toMatchObject({ code: 'READ_ONLY' });
+    await expect(api.updateConversationPriority(3, { priority: 'high' })).rejects.toMatchObject({
+      code: 'READ_ONLY',
+    });
+    expect(hits).toHaveLength(0);
+
+    // Every refused write is traced with a timestamp and where it came from.
+    const traced = log.mock.calls.map((call) => String(call[0]));
+    expect(traced.some((line) => /^\[api:write\] \S+Z POST \/conversations\/3\/messages BLOCKED$/.test(line))).toBe(
+      true,
+    );
+    expect(traced.some((line) => line.startsWith('[api:write] issued from:'))).toBe(true);
+    log.mockRestore();
+  });
+
+  it('in read-only mode, still reads and still refreshes the session', async () => {
+    const { tokenStorage, api } = load();
+    // expires_in=1s is inside the 30s skew window, so the read refreshes first.
+    await tokenStorage.save('expired-access', 'refresh-1', 1);
+    mockReadOnly = true;
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    handler = (req, _body, res) =>
+      req.url === '/api/v1/auth/refresh'
+        ? ok(res, { access_token: 'access-2', refresh_token: 'refresh-2', token_type: 'bearer', expires_in: 3600 })
+        : ok(res, { permissions: [] });
+
+    await expect(api.getBootstrap()).resolves.toMatchObject({ httpStatus: 200 });
+    expect(hits.map((hit) => `${hit.method} ${hit.path}`)).toEqual([
+      'POST /api/v1/auth/refresh',
+      'GET /api/v1/me/bootstrap',
+    ]);
+    jest.mocked(console.log).mockRestore();
   });
 
   it('never hands credentials to a non-Wazigo host and resolves relative media paths', async () => {
