@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { Redirect, router } from 'expo-router';
 
 import { normalizeError } from '@/api/network';
-import { AppText, Button, IconButton, Screen } from '@/components/common';
+import { AppText, IconButton, Screen } from '@/components/common';
 import { Banner } from '@/components/feedback';
 import { OtpInput } from '@/components/forms';
 import { Config } from '@/constants/config';
-import { Layout, Spacing } from '@/constants/theme';
+import { Colors, Layout, Spacing } from '@/constants/theme';
 import { selectIsAuthenticated, selectOtpChallenge } from '@/features/auth/authSelectors';
 import { requestLoginOtp, signInWithOtp } from '@/features/auth/authThunks';
 import { authErrorMessage, authFieldErrors } from '@/features/auth/errors';
@@ -19,10 +27,13 @@ import { formatCountdown, secondsUntil } from '@/utils/time';
 
 const Copy = {
   title: 'Verify Your Number',
-  verify: 'Verify and continue',
+  sentTo: (length: number) => `We've sent a ${length}-digit WhatsApp code to`,
+  validFor: (minutes: number) => `The code is valid for ${minutes} minutes.`,
   resend: 'Resend code',
-  noCode: 'Did not receive the code?',
+  noCode: "Didn't receive the code?",
+  resendIn: 'Resend in',
   resent: 'We have sent a new code.',
+  verifying: 'Verifying…',
   offlineHint: 'You need an internet connection to verify the code.',
   back: 'Back to sign in',
 };
@@ -106,6 +117,7 @@ export default function OtpScreen() {
   if (!challenge || !phone) return authenticated ? null : <Redirect href="/login" />;
 
   const busy = verifying || resending;
+  const displayPhone = formatPhoneForDisplay(phone);
 
   return (
     <Screen background="surface" padded={false}>
@@ -119,12 +131,22 @@ export default function OtpScreen() {
             <IconButton icon="chevron-back" accessibilityLabel={Copy.back} onPress={goBack} />
           </View>
 
-          <AppText variant="display" accessibilityRole="header">
+          {/* Design screen 3: centred title, then the number on its own line in green. */}
+          <AppText variant="display" align="center" accessibilityRole="header">
             {Copy.title}
           </AppText>
-          <AppText variant="bodySmall" color="textSecondary" style={styles.subtitle}>
-            {`We have sent a ${Config.otpLength}-digit code to ${formatPhoneForDisplay(phone)} on WhatsApp. It is valid for ${Config.otpValidityMinutes} minutes.`}
-          </AppText>
+          <View
+            style={styles.subtitle}
+            accessible
+            accessibilityLabel={`${Copy.sentTo(Config.otpLength)} ${displayPhone}. ${Copy.validFor(Config.otpValidityMinutes)}`}
+          >
+            <AppText variant="bodySmall" color="textSecondary" align="center">
+              {Copy.sentTo(Config.otpLength)}
+            </AppText>
+            <AppText variant="title" color="deepGreen" align="center">
+              {displayPhone}
+            </AppText>
+          </View>
 
           {/* Offline is reported once by the global strip in `Screen`. */}
           {challenge.notice || info || error ? (
@@ -137,6 +159,9 @@ export default function OtpScreen() {
             </View>
           ) : null}
 
+          {/* No verify button, as in the design: the code is checked as soon as the
+              last digit is in, whether typed, pasted or autofilled. A wrong code is
+              cleared so the next attempt starts empty. */}
           <OtpInput
             value={code}
             onChangeText={(next) => {
@@ -150,43 +175,51 @@ export default function OtpScreen() {
             hasError={!!error}
           />
 
-          <Button
-            title={Copy.verify}
-            onPress={() => void verify(code)}
-            loading={verifying}
-            disabled={offline || code.length < Config.otpLength}
-            accessibilityHint={offline ? Copy.offlineHint : undefined}
-            style={styles.submit}
-          />
           {offline ? (
             <AppText variant="caption" color="textSecondary" align="center" style={styles.hint}>
               {Copy.offlineHint}
             </AppText>
           ) : null}
 
-          <View style={styles.resend}>
-            <AppText variant="caption" color="textSecondary">
-              {Copy.noCode}
-            </AppText>
-            {secondsLeft > 0 ? (
-              <AppText variant="captionMedium" color="textMuted">
-                {`Resend in ${formatCountdown(secondsLeft)}`}
+          {verifying ? (
+            <View style={styles.row} accessibilityLiveRegion="polite">
+              <ActivityIndicator color={Colors.primary} size="small" />
+              <AppText variant="caption" color="textSecondary">
+                {Copy.verifying}
               </AppText>
-            ) : (
-              <Pressable
-                onPress={() => void resend()}
-                disabled={busy || offline}
-                accessibilityRole="button"
-                accessibilityLabel={Copy.resend}
-                accessibilityState={{ disabled: busy || offline, busy: resending }}
-                hitSlop={8}
-              >
-                <AppText variant="captionMedium" color={busy || offline ? 'disabledText' : 'deepGreen'}>
-                  {Copy.resend}
+            </View>
+          ) : (
+            <View style={styles.row}>
+              <AppText variant="caption" color="textSecondary">
+                {Copy.noCode}
+              </AppText>
+              {secondsLeft > 0 ? (
+                <AppText
+                  variant="caption"
+                  color="textSecondary"
+                  accessibilityLabel={`${Copy.resendIn} ${secondsLeft} seconds`}
+                >
+                  {`${Copy.resendIn} `}
+                  <AppText variant="captionMedium" color="textPrimary">
+                    {formatCountdown(secondsLeft)}
+                  </AppText>
                 </AppText>
-              </Pressable>
-            )}
-          </View>
+              ) : (
+                <Pressable
+                  onPress={() => void resend()}
+                  disabled={busy || offline}
+                  accessibilityRole="button"
+                  accessibilityLabel={Copy.resend}
+                  accessibilityState={{ disabled: busy || offline, busy: resending }}
+                  hitSlop={8}
+                >
+                  <AppText variant="captionMedium" color={busy || offline ? 'disabledText' : 'deepGreen'}>
+                    {Copy.resend}
+                  </AppText>
+                </Pressable>
+              )}
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -197,23 +230,23 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: Layout.screenPadding,
-    paddingVertical: Spacing.xxl,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xxl,
     maxWidth: Layout.maxContentWidth,
     width: '100%',
     alignSelf: 'center',
   },
-  header: { alignItems: 'flex-start', marginBottom: Spacing.xl },
-  subtitle: { marginTop: Spacing.sm, marginBottom: Spacing.xxl },
+  // The back arrow sits at the top; the title starts well below it, as in the design.
+  header: { alignItems: 'flex-start', marginBottom: Spacing.huge },
+  subtitle: { marginTop: Spacing.sm, marginBottom: Spacing.xxxl, gap: Spacing.xxs },
   banners: { gap: Spacing.sm, marginBottom: Spacing.xl },
-  hint: { marginTop: Spacing.sm },
-  submit: { marginTop: Spacing.xxl },
-  resend: {
+  hint: { marginTop: Spacing.md },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.xs,
-    marginTop: Spacing.xl,
+    marginTop: Spacing.xxl,
   },
 });

@@ -96,13 +96,13 @@ export function OtpInput({
 
 const styles = StyleSheet.create({
   container: { position: 'relative' },
-  boxes: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm },
+  // Design screen 3: compact boxes centred as a group, not stretched across the width.
+  boxes: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.md },
   box: {
-    flex: 1,
-    maxWidth: 62,
-    height: 58,
+    width: 48,
+    height: 56,
     borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -5,6 +5,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
   type TextInput,
 } from 'react-native';
@@ -40,6 +41,8 @@ const Copy = {
   offlineHint: 'You need an internet connection to sign in.',
   or: 'or',
 };
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export default function LoginScreen() {
   const dispatch = useAppDispatch();
@@ -103,18 +106,23 @@ export default function LoginScreen() {
     }
   });
 
+  // Design screen 2: content starts in the upper part of the screen rather than
+  // centred, under a wordmark about 60% of the width.
+  const { width, height } = useWindowDimensions();
+  const wordmarkWidth = clamp(Math.round(width * 0.6), 190, 250);
+
   return (
     <Screen background="surface" padded={false}>
       {/* The scroll view sits inside the avoiding view: nesting them the other
           way round leaves the focused field under the keyboard. */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingTop: Math.round(height * 0.1) }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <BrandLogo variant="logoDark" width={168} />
+            <BrandLogo variant="logoDark" width={wordmarkWidth} />
           </View>
 
           <AppText variant="display" align="center" accessibilityRole="header">
@@ -137,14 +145,16 @@ export default function LoginScreen() {
             name="phone"
             render={({ field, fieldState }) => (
               <PhoneField
-                label={Copy.phoneLabel}
+                // No visible label or hint in the design; screen readers still
+                // get both.
+                accessibilityLabel={Copy.phoneLabel}
+                accessibilityHint={mode === 'otp' ? Copy.otpHint : undefined}
                 placeholder={Copy.phonePlaceholder}
                 value={field.value}
                 onChangeText={field.onChange}
                 onBlur={field.onBlur}
                 editable={!busy}
                 error={fieldState.error?.message}
-                hint={mode === 'otp' && !fieldState.error ? Copy.otpHint : undefined}
                 containerStyle={styles.field}
                 returnKeyType={mode === 'password' ? 'next' : 'done'}
                 onSubmitEditing={() =>
@@ -161,7 +171,7 @@ export default function LoginScreen() {
               render={({ field, fieldState }) => (
                 <TextField
                   ref={passwordRef}
-                  label={Copy.passwordLabel}
+                  accessibilityLabel={Copy.passwordLabel}
                   placeholder={Copy.passwordPlaceholder}
                   value={field.value}
                   onChangeText={field.onChange}
@@ -194,7 +204,6 @@ export default function LoginScreen() {
             loading={busy}
             disabled={offline}
             accessibilityHint={offline ? Copy.offlineHint : undefined}
-            style={styles.submit}
           />
           {offline ? (
             <AppText variant="caption" color="textSecondary" align="center" style={styles.hint}>
@@ -227,19 +236,25 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: Layout.screenPadding,
-    paddingVertical: Spacing.xxl,
+    paddingBottom: Spacing.xxl,
     maxWidth: Layout.maxContentWidth,
     width: '100%',
     alignSelf: 'center',
   },
   header: { alignItems: 'center', marginBottom: Spacing.xxxl },
-  subtitle: { marginTop: Spacing.sm, marginBottom: Spacing.xxl },
+  // Narrow enough to wrap onto two lines, as in the design.
+  subtitle: { marginTop: Spacing.sm, marginBottom: Spacing.xxxl, maxWidth: 220, alignSelf: 'center' },
   banners: { gap: Spacing.sm, marginBottom: Spacing.lg },
-  field: { marginBottom: Spacing.lg },
-  submit: { marginTop: Spacing.sm },
+  field: { marginBottom: Spacing.xxl },
   hint: { marginTop: Spacing.sm },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginVertical: Spacing.xl },
-  rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },
+  // "— or —": short dashes either side, not rules across the screen.
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginVertical: Spacing.xxl,
+  },
+  rule: { width: 20, height: 1, backgroundColor: Colors.borderStrong },
 });
