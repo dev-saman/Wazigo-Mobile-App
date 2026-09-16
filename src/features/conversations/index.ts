@@ -12,6 +12,8 @@ export {
   selectConversationById,
   selectConversations,
   selectConversationsError,
+  selectConversationsLoadedAt,
+  selectConversationsPage,
   selectConversationsStatus,
   selectConversationsTotal,
   selectHasMoreConversations,

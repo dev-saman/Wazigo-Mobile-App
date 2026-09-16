@@ -13,12 +13,14 @@ import {
   selectDashboardActivity,
   selectDashboardDelivery,
   selectDashboardError,
+  selectDashboardLoadedAt,
   selectDashboardStatus,
   selectDashboardTotals,
   selectPriorityBreakdown,
 } from '@/features/dashboard';
 import { DashboardHeader } from '@/features/dashboard/components/DashboardHeader';
 import { GreetingCard } from '@/features/dashboard/components/GreetingCard';
+import { useLiveRefresh } from '@/features/realtime';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 const Copy = {
@@ -62,6 +64,7 @@ function DashboardScreen() {
   const user = useAppSelector(selectCurrentUser);
   const status = useAppSelector(selectDashboardStatus);
   const error = useAppSelector(selectDashboardError);
+  const loadedAt = useAppSelector(selectDashboardLoadedAt);
   const totals = useAppSelector(selectDashboardTotals);
   const priorities = useAppSelector(selectPriorityBreakdown);
   const activity = useAppSelector(selectDashboardActivity);
@@ -74,6 +77,12 @@ function DashboardScreen() {
   const refresh = useCallback(() => {
     void dispatch(loadDashboard({ refresh: true }));
   }, [dispatch]);
+
+  // No socket yet, so the figures catch up on foreground and on reconnect.
+  useLiveRefresh(
+    useCallback(() => void dispatch(loadDashboard({ quiet: true })), [dispatch]),
+    { loadedAt, enabled: status !== 'failed' },
+  );
 
   if (status === 'failed') {
     return (

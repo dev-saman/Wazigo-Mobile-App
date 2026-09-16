@@ -33,6 +33,8 @@ export type ConversationsState = {
   page: number;
   lastPage: number;
   total: number;
+  /** When page 1 last arrived, for the foreground/reconnect refresh. */
+  loadedAt: number | null;
 };
 
 const initialState: ConversationsState = {
@@ -44,6 +46,7 @@ const initialState: ConversationsState = {
   page: 0,
   lastPage: 1,
   total: 0,
+  loadedAt: null,
 };
 
 /** Keeps the server's order while making sure a row never appears twice. */
@@ -78,6 +81,7 @@ const conversationsSlice = createSlice({
       state.total = total;
       state.status = 'ready';
       state.error = null;
+      if (mode !== 'more') state.loadedAt = Date.now();
     },
     conversationsFailed(state, action: PayloadAction<ApiError>) {
       state.error = action.payload;
@@ -101,6 +105,7 @@ const conversationsSlice = createSlice({
       state.page = 0;
       state.lastPage = 1;
       state.total = 0;
+      state.loadedAt = null;
       state.status = 'loading';
       state.error = null;
     },
@@ -111,6 +116,7 @@ const conversationsSlice = createSlice({
       state.page = 0;
       state.lastPage = 1;
       state.total = 0;
+      state.loadedAt = null;
       state.status = 'loading';
       state.error = null;
     },

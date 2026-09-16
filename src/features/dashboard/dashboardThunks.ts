@@ -10,10 +10,15 @@ import { dashboardFailed, dashboardLoaded, dashboardLoading } from './dashboardS
  * number the user can reach, not just their own. The fix belongs on the server;
  * filtering here would only hide the discrepancy.
  */
-export const loadDashboard = createAppAsyncThunk<DashboardOverview, { refresh?: boolean } | void>(
+export const loadDashboard = createAppAsyncThunk<
+  DashboardOverview,
+  { refresh?: boolean; quiet?: boolean } | void
+>(
   'dashboard/load',
   async (arg, { dispatch, rejectWithValue }) => {
-    dispatch(dashboardLoading({ refresh: !!(arg && arg.refresh) }));
+    // `quiet` is the foreground/reconnect refresh: no pull-to-refresh spinner,
+    // because the user did not ask for it.
+    if (!(arg && arg.quiet)) dispatch(dashboardLoading({ refresh: !!(arg && arg.refresh) }));
     try {
       const { data } = await api.getDashboardOverview();
       dispatch(dashboardLoaded(data));

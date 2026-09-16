@@ -11,10 +11,12 @@ const PER_PAGE = 30;
  * itself, which is fresher than the row the user tapped - that row may have
  * been listed minutes ago.
  */
-export const loadThread = createAppAsyncThunk<void, { conversationId: string }>(
+export const loadThread = createAppAsyncThunk<void, { conversationId: string; quiet?: boolean }>(
   'messages/loadThread',
-  async ({ conversationId }, { dispatch, rejectWithValue }) => {
-    dispatch(threadLoading({ conversationId, older: false }));
+  async ({ conversationId, quiet = false }, { dispatch, rejectWithValue }) => {
+    // A quiet reload (foreground, reconnect) must not blank a thread the user
+    // is reading: no loading status, so the skeleton never replaces it.
+    if (!quiet) dispatch(threadLoading({ conversationId, older: false }));
     try {
       const { data, meta } = await api.getConversationMessages(conversationId, {
         page: 1,

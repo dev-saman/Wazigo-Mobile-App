@@ -1,6 +1,7 @@
 export { bootstrapReducer } from './bootstrapSlice';
 export {
   selectBootstrapError,
+  selectBootstrapLoadedAt,
   selectBootstrapReady,
   selectBootstrapStatus,
   selectHasAnyPermission,

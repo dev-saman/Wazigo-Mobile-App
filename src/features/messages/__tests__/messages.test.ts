@@ -169,3 +169,43 @@ describe('markConversationRead', () => {
     expect(store.getState().conversations.status).not.toBe('failed');
   });
 });
+
+describe('the quiet reload behind the live fallback', () => {
+  const T1 = '2026-09-16T09:00:00Z';
+  const T2 = '2026-09-16T10:00:00Z';
+  const T3 = '2026-09-16T11:00:00Z';
+
+  it('never blanks a thread the user is reading', async () => {
+    jest.mocked(api.getConversationMessages).mockResolvedValue(page([message(2, T2), message(1, T1)], 1, 2));
+    await store.dispatch(loadThread({ conversationId: CONVERSATION_ID }));
+
+    const statuses: string[] = [];
+    const unsubscribe = store.subscribe(() =>
+      statuses.push(store.getState().messages.byConversation[CONVERSATION_ID].status),
+    );
+    jest.mocked(api.getConversationMessages).mockResolvedValue(page([message(3, T3), message(2, T2)], 1, 2));
+
+    await store.dispatch(loadThread({ conversationId: CONVERSATION_ID, quiet: true }));
+    unsubscribe();
+
+    expect(statuses).not.toContain('loading');
+    const thread = store.getState().messages.byConversation[CONVERSATION_ID];
+    expect(thread.items.map((item) => item.id)).toEqual([3, 2]);
+    expect(thread.loadedAt).not.toBeNull();
+  });
+
+  it('leaves the messages alone when it fails', async () => {
+    jest.mocked(api.getConversationMessages).mockResolvedValue(page([message(2, T2), message(1, T1)], 1, 1));
+    await store.dispatch(loadThread({ conversationId: CONVERSATION_ID }));
+
+    jest
+      .mocked(api.getConversationMessages)
+      .mockRejectedValue({ code: 'TIMEOUT', message: 'slow' } as ApiError);
+    await store.dispatch(loadThread({ conversationId: CONVERSATION_ID, quiet: true }));
+
+    const thread = store.getState().messages.byConversation[CONVERSATION_ID];
+    expect(thread.items).toHaveLength(2);
+    expect(thread.status).toBe('ready');
+    expect(thread.error?.code).toBe('TIMEOUT');
+  });
+});

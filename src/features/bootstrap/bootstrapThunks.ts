@@ -30,11 +30,19 @@ const select = (payload: BootstrapPayload | undefined): BootstrapData => ({
 /**
  * AUTH-05. The signed-in area does not render until this succeeds, so nothing
  * can be shown or sent without the server's own view of what the user may do.
+ *
+ * `silent` is the periodic re-fetch (app foreground / reconnect) that picks up
+ * a permission change made on the server mid-session. It never shows the
+ * loading gate, and a transient failure keeps the permissions already in hand -
+ * the app must not fall back to a retry screen because one background call
+ * timed out. A 403 or a 401 is not transient: access was taken away, and it is
+ * handled exactly as it would be on the first load.
  */
-export const loadBootstrap = createAppAsyncThunk<BootstrapData, void>(
+export const loadBootstrap = createAppAsyncThunk<BootstrapData, { silent?: boolean } | void>(
   'bootstrap/load',
-  async (_, { dispatch, rejectWithValue }) => {
-    dispatch(bootstrapLoading());
+  async (arg, { dispatch, rejectWithValue }) => {
+    const silent = !!(arg && arg.silent);
+    if (!silent) dispatch(bootstrapLoading());
     try {
       const { data } = await api.getBootstrap();
       const bootstrap = select(data);
@@ -44,7 +52,9 @@ export const loadBootstrap = createAppAsyncThunk<BootstrapData, void>(
       return bootstrap;
     } catch (error) {
       const apiError = normalizeError(error);
-      dispatch(bootstrapFailed(apiError));
+      const revoked = apiError.code === 'FORBIDDEN' || apiError.code === 'UNAUTHORIZED';
+      if (!silent || revoked) dispatch(bootstrapFailed(apiError));
+      else if (__DEV__) console.warn('[bootstrap] silent refresh failed', apiError.code);
       return rejectWithValue(apiError);
     }
   },

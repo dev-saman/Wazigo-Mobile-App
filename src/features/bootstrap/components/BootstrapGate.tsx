@@ -1,13 +1,14 @@
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, type ReactNode } from 'react';
 
 import { Button, Screen } from '@/components/common';
 import { ErrorState } from '@/components/feedback';
 import { selectAuthStatus } from '@/features/auth/authSelectors';
 import { signOut } from '@/features/auth/authThunks';
 import { SplashView } from '@/features/auth/components/SplashView';
+import { PERMISSIONS_REFRESH_AFTER_MS, useLiveRefresh } from '@/features/realtime';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
-import { selectBootstrapError, selectBootstrapStatus } from '../bootstrapSelectors';
+import { selectBootstrapError, selectBootstrapLoadedAt, selectBootstrapStatus } from '../bootstrapSelectors';
 import { loadBootstrap } from '../bootstrapThunks';
 import { AccessDeniedView } from './AccessDeniedView';
 
@@ -27,11 +28,23 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
   const status = useAppSelector(selectBootstrapStatus);
   const error = useAppSelector(selectBootstrapError);
+  const loadedAt = useAppSelector(selectBootstrapLoadedAt);
   const authStatus = useAppSelector(selectAuthStatus);
 
   useEffect(() => {
     if (status === 'idle') void dispatch(loadBootstrap());
   }, [dispatch, status]);
+
+  /**
+   * Permissions used to be fetched once per session, so a change on the server
+   * was only seen on the next launch. They are re-fetched on foreground and on
+   * reconnect now - silently, so a background failure keeps the permissions the
+   * app already has instead of throwing up a retry screen.
+   */
+  useLiveRefresh(
+    useCallback(() => void dispatch(loadBootstrap({ silent: true })), [dispatch]),
+    { loadedAt, maxAgeMs: PERMISSIONS_REFRESH_AFTER_MS, enabled: status === 'ready' },
+  );
 
   // A 401 that survived the network layer's refresh means the session is gone.
   useEffect(() => {

@@ -4,7 +4,9 @@ export {
   selectThread,
   selectThreadConversation,
   selectThreadError,
+  selectThreadLoadedAt,
   selectThreadMessages,
+  selectThreadPage,
   selectThreadStatus,
   selectUploadProgress,
 } from './messagesSelectors';

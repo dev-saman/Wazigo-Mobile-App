@@ -158,3 +158,35 @@ describe('failures', () => {
     expect(state.error).toBeNull();
   });
 });
+
+describe('the quiet refresh behind the live fallback', () => {
+  it('replaces the rows without ever showing a loading state', async () => {
+    await store.dispatch(loadConversations());
+    const loadedAt = store.getState().conversations.loadedAt;
+    expect(loadedAt).not.toBeNull();
+
+    const statuses: string[] = [];
+    const unsubscribe = store.subscribe(() => statuses.push(store.getState().conversations.status));
+    jest.mocked(api.getConversations).mockResolvedValue(page([row(3), row(4)]));
+
+    await store.dispatch(loadConversations({ quiet: true }));
+    unsubscribe();
+
+    // Nobody pulled this refresh, so no spinner and no skeleton may appear.
+    expect(statuses).not.toContain('loading');
+    expect(statuses).not.toContain('refreshing');
+    expect(store.getState().conversations.items.map((item) => item.id)).toEqual([3, 4]);
+  });
+
+  it('keeps the rows and records the error when it fails', async () => {
+    await store.dispatch(loadConversations());
+    jest.mocked(api.getConversations).mockRejectedValue({ code: 'OFFLINE', message: 'offline' } as ApiError);
+
+    await store.dispatch(loadConversations({ quiet: true }));
+
+    const state = store.getState().conversations;
+    expect(state.items).toHaveLength(2);
+    expect(state.status).toBe('ready');
+    expect(state.error?.code).toBe('OFFLINE');
+  });
+});

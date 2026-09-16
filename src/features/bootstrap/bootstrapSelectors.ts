@@ -4,6 +4,7 @@ import type { RootState } from '@/store/store';
 export const selectBootstrapStatus = (state: RootState) => state.bootstrap.status;
 export const selectBootstrapError = (state: RootState) => state.bootstrap.error;
 export const selectBootstrapReady = (state: RootState) => state.bootstrap.status === 'ready';
+export const selectBootstrapLoadedAt = (state: RootState) => state.bootstrap.loadedAt;
 
 export const selectPermissions = (state: RootState) => state.bootstrap.permissions;
 export const selectRoles = (state: RootState) => state.bootstrap.roles;

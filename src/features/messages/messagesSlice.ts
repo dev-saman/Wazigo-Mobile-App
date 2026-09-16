@@ -23,6 +23,8 @@ export type ThreadState = {
   total: number;
   /** From `meta.conversation` - the thread as the server sees it right now. */
   conversation: Conversation | null;
+  /** When the newest page last arrived, for the foreground/reconnect refresh. */
+  loadedAt: number | null;
 };
 
 export type MessagesState = {
@@ -43,6 +45,7 @@ const createThread = (): ThreadState => ({
   lastPage: 1,
   total: 0,
   conversation: null,
+  loadedAt: null,
 });
 
 /** Read-only default for selectors, so an unopened thread is never undefined. */
@@ -93,6 +96,7 @@ const messagesSlice = createSlice({
       thread.total = total;
       thread.status = 'ready';
       thread.error = null;
+      if (!older) thread.loadedAt = Date.now();
       if (conversation) thread.conversation = conversation;
     },
     threadFailed(state, action: PayloadAction<{ conversationId: string; error: ApiError }>) {

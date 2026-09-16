@@ -24,10 +24,13 @@ import {
   selectChatSearch,
   selectConversations,
   selectConversationsError,
+  selectConversationsLoadedAt,
+  selectConversationsPage,
   selectConversationsStatus,
   selectHasMoreConversations,
   type ChatFilter,
 } from '@/features/conversations';
+import { useLiveRefresh } from '@/features/realtime';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 /** Long enough to stop typing, short enough to feel immediate. */
@@ -53,6 +56,8 @@ function ChatsScreen() {
   const filter = useAppSelector(selectChatFilter);
   const search = useAppSelector(selectChatSearch);
   const hasMore = useAppSelector(selectHasMoreConversations);
+  const loadedAt = useAppSelector(selectConversationsLoadedAt);
+  const page = useAppSelector(selectConversationsPage);
   const narrowed = useAppSelector(selectChatQueryIsNarrowed);
 
   const [term, setTerm] = useState(search);
@@ -74,6 +79,14 @@ function ChatsScreen() {
   const onRefresh = useCallback(() => {
     void dispatch(loadConversations({ refresh: true }));
   }, [dispatch]);
+
+  // The REST fallback for live updates: quiet, so no spinner nobody pulled.
+  // Not once the user has paged, though - page 1 would replace rows they
+  // scrolled to. Pull-to-refresh stays theirs to choose.
+  useLiveRefresh(
+    useCallback(() => void dispatch(loadConversations({ quiet: true })), [dispatch]),
+    { loadedAt, enabled: status !== 'failed' && page <= 1 },
+  );
 
   const onEndReached = useCallback(() => {
     if (hasMore) void dispatch(loadMoreConversations());

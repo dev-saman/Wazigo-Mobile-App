@@ -6,6 +6,8 @@ export const selectConversationsError = (state: RootState) => state.conversation
 export const selectChatFilter = (state: RootState) => state.conversations.filter;
 export const selectChatSearch = (state: RootState) => state.conversations.search;
 export const selectConversationsTotal = (state: RootState) => state.conversations.total;
+export const selectConversationsLoadedAt = (state: RootState) => state.conversations.loadedAt;
+export const selectConversationsPage = (state: RootState) => state.conversations.page;
 
 /** True while CHAT-01 reports pages the app has not fetched yet. */
 export const selectHasMoreConversations = (state: RootState) =>

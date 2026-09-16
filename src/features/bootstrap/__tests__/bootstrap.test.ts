@@ -142,3 +142,54 @@ describe('selectors', () => {
     expect(selectPrimaryNumber(store.getState())?.id).toBe(2);
   });
 });
+
+describe('the silent re-fetch that picks up a permission change', () => {
+  beforeEach(async () => {
+    await store.dispatch(loadBootstrap()).unwrap();
+  });
+
+  it('applies a permission the server has added, without showing the gate', async () => {
+    const statuses: string[] = [];
+    const unsubscribe = store.subscribe(() => statuses.push(store.getState().bootstrap.status));
+    jest.mocked(api.getBootstrap).mockResolvedValue({
+      data: { ...payload, permissions: [Permissions.conversationsView, Permissions.dashboardView] },
+      httpStatus: 200,
+    });
+
+    await store.dispatch(loadBootstrap({ silent: true })).unwrap();
+    unsubscribe();
+
+    // 'loading' would replace the whole signed-in area with the splash.
+    expect(statuses).not.toContain('loading');
+    expect(selectHasPermission(Permissions.dashboardView)(store.getState())).toBe(true);
+    expect(selectHasPermission(Permissions.conversationsSend)(store.getState())).toBe(false);
+  });
+
+  it('keeps the permissions it already has when the call simply fails', async () => {
+    failWith({ code: 'OFFLINE', message: 'offline', isOffline: true } as ApiError);
+
+    await store.dispatch(loadBootstrap({ silent: true }));
+
+    const state = store.getState().bootstrap;
+    expect(state.status).toBe('ready');
+    expect(state.permissions).toEqual(payload.permissions);
+    expect(state.error).toBeNull();
+  });
+
+  it('still denies access the moment the server takes it away', async () => {
+    failWith({ code: 'FORBIDDEN', status: 403, message: 'Your access was removed.' } as ApiError);
+
+    await store.dispatch(loadBootstrap({ silent: true }));
+
+    expect(store.getState().bootstrap.status).toBe('denied');
+  });
+
+  it('still reports a dead session, which signs the user out', async () => {
+    failWith({ code: 'UNAUTHORIZED', status: 401, message: 'Unauthenticated.' } as ApiError);
+
+    await store.dispatch(loadBootstrap({ silent: true }));
+
+    expect(store.getState().bootstrap.status).toBe('failed');
+    expect(store.getState().bootstrap.error?.code).toBe('UNAUTHORIZED');
+  });
+});

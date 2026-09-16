@@ -44,13 +44,16 @@ import {
   selectThread,
   selectThreadConversation,
   selectThreadError,
+  selectThreadLoadedAt,
   selectThreadMessages,
+  selectThreadPage,
   selectThreadStatus,
   retryMessage,
   sendMedia,
   sendText,
   type ThreadRow,
 } from '@/features/messages';
+import { useLiveRefresh } from '@/features/realtime';
 import { pickDocument, pickFromCamera, pickFromLibrary } from '@/services/media/picker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
@@ -75,6 +78,8 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const error = useAppSelector(selectThreadError(conversationId));
   const conversation = useAppSelector(selectThreadConversation(conversationId));
   const hasOlder = useAppSelector(selectHasOlderMessages(conversationId));
+  const loadedAt = useAppSelector(selectThreadLoadedAt(conversationId));
+  const page = useAppSelector(selectThreadPage(conversationId));
   // The listed row fills the header while the first page is still loading.
   const listed = useAppSelector(selectConversationById(conversationId));
   // The window belongs to the conversation, so the fresher of the two wins.
@@ -111,6 +116,15 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
     markedRead.current = true;
     void dispatch(markConversationRead({ conversationId }));
   }, [conversation, conversationId, dispatch, status]);
+
+  // Until live events arrive, an open thread catches up on foreground and on
+  // reconnect. Quiet: unsent messages stay put and the skeleton never returns.
+  // Only while the newest page is the whole thread - reloading page 1 under
+  // someone who has scrolled back through history would throw it away.
+  useLiveRefresh(
+    useCallback(() => void dispatch(loadThread({ conversationId, quiet: true })), [conversationId, dispatch]),
+    { loadedAt, enabled: status !== 'failed' && page <= 1 },
+  );
 
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
 

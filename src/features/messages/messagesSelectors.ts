@@ -22,6 +22,13 @@ export const selectThreadConversation = (conversationId: string) => (state: Root
 export const selectThreadError = (conversationId: string) => (state: RootState) =>
   state.messages.byConversation[conversationId]?.error ?? null;
 
+export const selectThreadLoadedAt = (conversationId: string) => (state: RootState) =>
+  state.messages.byConversation[conversationId]?.loadedAt ?? null;
+
+/** How deep into the history the user has paged; 1 is the newest page alone. */
+export const selectThreadPage = (conversationId: string) => (state: RootState) =>
+  state.messages.byConversation[conversationId]?.page ?? 0;
+
 /** True while CHAT-02 reports older pages the app has not fetched. */
 export const selectHasOlderMessages = (conversationId: string) => (state: RootState) => {
   const thread = state.messages.byConversation[conversationId];

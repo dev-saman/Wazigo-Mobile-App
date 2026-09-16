@@ -52,13 +52,18 @@ const fetchPage = async (filter: ChatFilter, search: string, page: number) => {
   }
 };
 
-/** CHAT-01, page 1. `refresh` keeps the current rows visible while it runs. */
-export const loadConversations = createAppAsyncThunk<void, { refresh?: boolean } | void>(
+/**
+ * CHAT-01, page 1. `refresh` keeps the current rows visible while it runs;
+ * `quiet` also leaves the status alone, for the foreground/reconnect refresh
+ * that the user did not ask for - a spinner nobody pulled looks like a fault.
+ */
+export const loadConversations = createAppAsyncThunk<void, { refresh?: boolean; quiet?: boolean } | void>(
   'conversations/load',
   async (arg, { dispatch, getState, rejectWithValue }) => {
     const { filter, search } = getState().conversations;
-    const mode: LoadMode = arg && arg.refresh ? 'refresh' : 'initial';
-    dispatch(conversationsLoading({ mode }));
+    const quiet = !!(arg && arg.quiet);
+    const mode: LoadMode = arg && (arg.refresh || arg.quiet) ? 'refresh' : 'initial';
+    if (!quiet) dispatch(conversationsLoading({ mode }));
 
     try {
       const { data, meta } = await fetchPage(filter, search, 1);
