@@ -8,9 +8,11 @@
     "scheme": "wazigo",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "io.wazigo.app",
       "supportsTablet": false
     },
     "android": {
+      "package": "io.wazigo.app",
       "adaptiveIcon": {
         "backgroundColor": "#08B74F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
