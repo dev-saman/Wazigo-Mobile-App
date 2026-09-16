@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { Message } from '@/api/types';
 import { AppText } from '@/components/common';
@@ -17,9 +17,16 @@ export type MessageBubbleProps = {
   conversationId: string;
   /** 0-1 while this message's file is uploading. */
   progress?: number;
+  /** Long-press anywhere, or tap a failed message, to open its actions. */
+  onOpenActions?: (message: Message) => void;
 };
 
-function MessageBubbleComponent({ message, conversationId, progress }: MessageBubbleProps) {
+function MessageBubbleComponent({
+  message,
+  conversationId,
+  progress,
+  onOpenActions,
+}: MessageBubbleProps) {
   const outbound = message.direction === 'outbound';
   const media = MEDIA_TYPES.has(message.type);
   const body = message.text_body?.trim() || message.caption?.trim() || '';
@@ -27,14 +34,22 @@ function MessageBubbleComponent({ message, conversationId, progress }: MessageBu
   const time = ms ? formatIstTime(ms) : '';
   const failed = message.status === 'failed';
 
+  const bubbleStyle = [
+    styles.bubble,
+    outbound ? styles.bubbleOutbound : styles.bubbleInbound,
+    failed && styles.bubbleFailed,
+  ];
+
   return (
     <View style={[styles.row, outbound ? styles.rowOutbound : styles.rowInbound]}>
-      <View
-        style={[
-          styles.bubble,
-          outbound ? styles.bubbleOutbound : styles.bubbleInbound,
-          failed && styles.bubbleFailed,
-        ]}
+      <Pressable
+        onLongPress={onOpenActions ? () => onOpenActions(message) : undefined}
+        // A failed message is the one people want to act on, so a plain tap
+        // opens its actions too.
+        onPress={onOpenActions && failed ? () => onOpenActions(message) : undefined}
+        accessibilityRole={onOpenActions ? 'button' : undefined}
+        accessibilityHint={onOpenActions ? 'Opens message details' : undefined}
+        style={bubbleStyle}
       >
         {media ? <MediaAttachment message={message} conversationId={conversationId} /> : null}
 
@@ -74,7 +89,7 @@ function MessageBubbleComponent({ message, conversationId, progress }: MessageBu
             {message.error_detail}
           </AppText>
         ) : null}
-      </View>
+      </Pressable>
     </View>
   );
 }

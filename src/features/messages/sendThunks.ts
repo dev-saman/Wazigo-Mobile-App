@@ -54,10 +54,10 @@ export const sendText = createAppAsyncThunk<void, { conversationId: string; text
       const { data } = await api.sendTextMessage(conversationId, {
         text: body.slice(0, MessageLimits.textMax),
       });
-      dispatch(messageSent({ conversationId, localId: local.id, message: data }));
+      dispatch(messageSent({ conversationId, replacesId: local.id, message: data }));
     } catch (error) {
       const apiError = normalizeError(error);
-      dispatch(messageFailed({ conversationId, localId: local.id, detail: apiError.message }));
+      dispatch(messageFailed({ conversationId, messageId: local.id, detail: apiError.message }));
 
       // 409 means the conversation was reassigned while it was open. Retrying
       // would fail the same way, so the thread is reloaded to show the truth.
@@ -87,7 +87,7 @@ export const sendMedia = createAppAsyncThunk<
     media: { filename: file.name, mime: file.type, url: file.uri },
   });
   dispatch(messageQueued({ conversationId, message: local }));
-  dispatch(uploadProgress({ conversationId, localId: local.id, fraction: 0 }));
+  dispatch(uploadProgress({ conversationId, messageId: local.id, fraction: 0 }));
 
   try {
     const { data } = await api.sendMediaMessage(
@@ -95,13 +95,13 @@ export const sendMedia = createAppAsyncThunk<
       { type, file, caption: trimmedCaption },
       {
         onProgress: (fraction) =>
-          dispatch(uploadProgress({ conversationId, localId: local.id, fraction })),
+          dispatch(uploadProgress({ conversationId, messageId: local.id, fraction })),
       },
     );
-    dispatch(messageSent({ conversationId, localId: local.id, message: data }));
+    dispatch(messageSent({ conversationId, replacesId: local.id, message: data }));
   } catch (error) {
     const apiError = normalizeError(error);
-    dispatch(messageFailed({ conversationId, localId: local.id, detail: apiError.message }));
+    dispatch(messageFailed({ conversationId, messageId: local.id, detail: apiError.message }));
     if (apiError.code === 'CONFLICT') void dispatch(loadThread({ conversationId }));
     return rejectWithValue(apiError);
   }
@@ -121,10 +121,10 @@ export const sendTemplate = createAppAsyncThunk<
 
   try {
     const { data } = await api.sendTemplate(conversationId, payload);
-    dispatch(messageSent({ conversationId, localId: local.id, message: data }));
+    dispatch(messageSent({ conversationId, replacesId: local.id, message: data }));
   } catch (error) {
     const apiError = normalizeError(error);
-    dispatch(messageFailed({ conversationId, localId: local.id, detail: apiError.message }));
+    dispatch(messageFailed({ conversationId, messageId: local.id, detail: apiError.message }));
     if (apiError.code === 'CONFLICT') void dispatch(loadThread({ conversationId }));
     return rejectWithValue(apiError);
   }

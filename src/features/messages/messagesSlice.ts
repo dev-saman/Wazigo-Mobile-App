@@ -111,17 +111,31 @@ const messagesSlice = createSlice({
       thread.items.unshift(action.payload.message);
       if (thread.status === 'idle' || thread.status === 'failed') thread.status = 'ready';
     },
-    /** 201: the server's Message replaces the local one, keeping its position. */
+    /**
+     * The server's Message takes the place of the one it answers for, keeping
+     * its position: a local draft after a send, or the same message again after
+     * a retry. CHAT-09 can answer 200 with `status:"failed"`, and that replaces
+     * the bubble just the same - the state comes from the server, not from us.
+     */
     messageSent(
       state,
-      action: PayloadAction<{ conversationId: string; localId: number; message: Message }>,
+      action: PayloadAction<{ conversationId: string; replacesId: number; message: Message }>,
     ) {
       const thread = threadOf(state, action.payload.conversationId);
-      const index = thread.items.findIndex((item) => item.id === action.payload.localId);
+      const index = thread.items.findIndex((item) => item.id === action.payload.replacesId);
       if (index >= 0) thread.items[index] = action.payload.message;
       else thread.items.unshift(action.payload.message);
-      delete thread.uploads[String(action.payload.localId)];
-      thread.total += 1;
+      delete thread.uploads[String(action.payload.replacesId)];
+      if (action.payload.replacesId < 0) thread.total += 1;
+    },
+    /** A retry is in flight: the bubble goes back to pending, clearing the error. */
+    messageRetrying(state, action: PayloadAction<{ conversationId: string; messageId: number }>) {
+      const thread = threadOf(state, action.payload.conversationId);
+      const message = thread.items.find((item) => item.id === action.payload.messageId);
+      if (message) {
+        message.status = 'pending';
+        message.error_detail = null;
+      }
     },
     /**
      * The send failed. The message stays exactly where it is: what someone
@@ -129,22 +143,22 @@ const messagesSlice = createSlice({
      */
     messageFailed(
       state,
-      action: PayloadAction<{ conversationId: string; localId: number; detail?: string }>,
+      action: PayloadAction<{ conversationId: string; messageId: number; detail?: string }>,
     ) {
       const thread = threadOf(state, action.payload.conversationId);
-      const message = thread.items.find((item) => item.id === action.payload.localId);
+      const message = thread.items.find((item) => item.id === action.payload.messageId);
       if (message) {
         message.status = 'failed';
         message.error_detail = action.payload.detail ?? null;
       }
-      delete thread.uploads[String(action.payload.localId)];
+      delete thread.uploads[String(action.payload.messageId)];
     },
     uploadProgress(
       state,
-      action: PayloadAction<{ conversationId: string; localId: number; fraction: number }>,
+      action: PayloadAction<{ conversationId: string; messageId: number; fraction: number }>,
     ) {
       const thread = threadOf(state, action.payload.conversationId);
-      thread.uploads[String(action.payload.localId)] = action.payload.fraction;
+      thread.uploads[String(action.payload.messageId)] = action.payload.fraction;
     },
     /** CHAT-06 and later the message actions return the updated Conversation. */
     threadConversationUpdated(
@@ -167,6 +181,7 @@ export const {
   messageQueued,
   messageSent,
   messageFailed,
+  messageRetrying,
   uploadProgress,
 } = messagesSlice.actions;
 

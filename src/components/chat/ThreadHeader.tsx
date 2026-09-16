@@ -9,6 +9,8 @@ export type ThreadHeaderProps = {
   /** CHAT-02's `meta.conversation` when it has arrived, else the listed row. */
   conversation: Conversation | null;
   onBack: () => void;
+  /** Opens the conversation actions sheet (design screen 10). */
+  onActions?: () => void;
 };
 
 /**
@@ -16,7 +18,7 @@ export type ThreadHeaderProps = {
  * calling API) and no customer presence - the Conversation resource has no
  * such field, and inventing "Online" would be a lie about a real person.
  */
-export function ThreadHeader({ conversation, onBack }: ThreadHeaderProps) {
+export function ThreadHeader({ conversation, onBack, onActions }: ThreadHeaderProps) {
   const contact = conversation?.contact;
   const name = contact?.name?.trim() || 'Conversation';
   const phone = contact?.phone ?? contact?.wa_id ?? null;
@@ -37,6 +39,14 @@ export function ThreadHeader({ conversation, onBack }: ThreadHeaderProps) {
         ) : null}
       </View>
       {resolved ? <Badge label="Resolved" tone="soft" /> : null}
+      {onActions ? (
+        <IconButton
+          icon="ellipsis-vertical"
+          accessibilityLabel="Conversation actions"
+          color="textSecondary"
+          onPress={onActions}
+        />
+      ) : null}
     </View>
   );
 }

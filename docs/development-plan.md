@@ -84,6 +84,7 @@ support them:
 | Location, Contact attachments | Attachment sheet | CHAT-04 supports image / document / audio / video only |
 | Opening a document, playing a video or audio | Conversation | Needs a viewer/player or sharing dependency that has not been chosen; the file is named instead |
 | Star, Mute, Archive, Report, Block actions | Conversation actions | No endpoints; using resolve / reopen / priority / labels / bot take-over |
+| Sent / Delivered / Read timeline | Message info | The Message resource carries one status and one timestamp, not per-state times |
 | Start a Conversation | Empty state | No outbound conversation creation in phase 1 |
 
 ## Endpoint map (verified against the workbook)
@@ -346,6 +347,30 @@ src/app/
   text, and the screen returns to the thread immediately rather than waiting.
 - **Not built:** creating or editing templates (dashboard only, no endpoint in scope).
 
+## Message states and actions (Stage 11)
+
+- `retryThunks.ts` (CHAT-09 + `retryAbilityFor`), `conversationActions.ts`
+  (CHAT-10/11/14/15/18), `labelsSlice.ts` (CHAT-13). UI: `Sheet` + `SheetAction` primitives,
+  `MessageActionsSheet`, `ConversationActionsSheet`, `PrioritySheet`, `LabelsSheet`.
+  `AttachmentSheet` was moved onto the shared `Sheet`.
+- **Retry depends on whether the server ever saw the message.** A failed message with a server id
+  goes through CHAT-09; a **local** one (negative id) never arrived, so it is simply sent again as
+  CHAT-03/04 - there is no id to retry and no chance of a duplicate.
+- **A 200 from CHAT-09 can still say `status:"failed"`.** The response replaces the bubble either
+  way, so the state always comes from the server rather than from an assumed success.
+- `retry.available` and `retry.blocked_reason` are respected instead of always offering the action,
+  and `retry.may_duplicate` is stated **before** the second send: the customer may get it twice.
+- Every conversation action answers with the Conversation, so each one patches the open thread and
+  the listed row from that response - no refetch, no locally guessed state.
+- **Reopening (CHAT-11) does not extend the reply window.** The sheet says so, and the window
+  banner keeps deciding what can be sent.
+- Priority and labels are gated on `conversations.tag`; take-over only appears while a chatbot
+  session is actually running. CHAT-14 replaces the whole label list, so the sheet is a
+  multi-select of the final state, not a sequence of add/remove calls.
+- "Message info" is limited to what the API returns - one status, one timestamp, the error detail
+  and the origin. The design's sent/delivered/read timeline needs per-state timestamps the
+  Message resource does not carry.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -358,7 +383,7 @@ src/app/
 8. Message history, older-page loading, mark read ✔
 9. Send text + media ✔
 10. Reply window + templates ✔
-11. Message states, retry, resolve/reopen, conversation actions
+11. Message states, retry, resolve/reopen, conversation actions ✔
 12. Offline, loading, session expired, access denied
 13. Realtime (Reverb) architecture with REST fallback
 14. Cleanup, lint, Expo Doctor, README, backend blockers doc

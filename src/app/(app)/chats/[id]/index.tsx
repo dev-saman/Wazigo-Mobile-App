@@ -2,12 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { Permissions } from '@/api/types';
+import { normalizeError } from '@/api/network';
+import { Permissions, type ConversationPriority, type Message } from '@/api/types';
 import {
   AttachmentSheet,
+  ConversationActionsSheet,
   DaySeparator,
+  LabelsSheet,
+  MessageActionsSheet,
   MessageBubble,
   MessageComposer,
+  PrioritySheet,
   ReplyWindowBanner,
   ThreadHeader,
   type AttachmentChoice,
@@ -18,8 +23,16 @@ import { Colors, Spacing } from '@/constants/theme';
 import { AccessDeniedView, RequirePermission, usePermission } from '@/features/bootstrap';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import {
+  loadLabels,
   markConversationRead,
+  reopenConversation,
+  resolveConversation,
   selectConversationById,
+  selectLabels,
+  selectLabelsStatus,
+  setConversationLabels,
+  setConversationPriority,
+  stopChatbot,
   useReplyWindow,
 } from '@/features/conversations';
 import {
@@ -32,6 +45,7 @@ import {
   selectThreadError,
   selectThreadMessages,
   selectThreadStatus,
+  retryMessage,
   sendMedia,
   sendText,
   type ThreadRow,
@@ -51,6 +65,7 @@ const Copy = {
   back: 'Back to chats',
   attachmentFailed: 'Attachment',
   offlineComposer: 'You are offline',
+  actionFailed: 'That did not work',
 };
 
 function ThreadScreen({ conversationId }: { conversationId: string }) {
@@ -72,10 +87,16 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const canViewTemplates = usePermission(Permissions.templatesView);
   const canSendTemplates = usePermission(Permissions.templatesSend);
   const canUseTemplates = canViewTemplates && canSendTemplates;
+  const canTag = usePermission(Permissions.conversationsTag);
+  const labels = useAppSelector(selectLabels);
+  const labelsStatus = useAppSelector(selectLabelsStatus);
 
   const [draft, setDraft] = useState('');
   const [attaching, setAttaching] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [actionMessage, setActionMessage] = useState<Message | null>(null);
+  const [openSheet, setOpenSheet] = useState<'none' | 'conversation' | 'priority' | 'labels'>('none');
+  const [actionBusy, setActionBusy] = useState(false);
 
   const markedRead = useRef(false);
 
@@ -110,6 +131,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
           message={item.message}
           conversationId={conversationId}
           progress={uploads[String(item.message.id)]}
+          onOpenActions={setActionMessage}
         />
       ) : (
         <DaySeparator ms={item.ms} />
@@ -155,7 +177,39 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
     [conversationId, dispatch, draft],
   );
 
-  const header = <ThreadHeader conversation={conversation ?? listed} onBack={goBack} />;
+  /** Every action answers with the Conversation, so nothing is refetched. */
+  const runAction = useCallback(
+    async (action: () => Promise<unknown>) => {
+      setActionBusy(true);
+      try {
+        await action();
+        setOpenSheet('none');
+      } catch (error) {
+        Alert.alert(Copy.actionFailed, normalizeError(error).message);
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [],
+  );
+
+  const onRetry = useCallback(
+    (message: Message) => {
+      setActionMessage(null);
+      void dispatch(retryMessage({ conversationId, message }));
+    },
+    [conversationId, dispatch],
+  );
+
+  const thread = conversation ?? listed;
+
+  const header = (
+    <ThreadHeader
+      conversation={thread}
+      onBack={goBack}
+      onActions={() => setOpenSheet('conversation')}
+    />
+  );
 
   if (status === 'failed') {
     // Blocker 2: CHAT-02's policy is wider than this app's personal scope, so a
@@ -255,6 +309,53 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         onClose={() => setSheetOpen(false)}
         onSelect={(choice) => void onAttachment(choice)}
       />
+
+      <MessageActionsSheet
+        visible={!!actionMessage}
+        message={actionMessage}
+        onClose={() => setActionMessage(null)}
+        onRetry={onRetry}
+      />
+
+      <ConversationActionsSheet
+        visible={openSheet === 'conversation'}
+        conversation={thread}
+        canTag={canTag}
+        busy={actionBusy}
+        onClose={() => setOpenSheet('none')}
+        onResolve={() => void runAction(() => dispatch(resolveConversation({ conversationId })).unwrap())}
+        onReopen={() => void runAction(() => dispatch(reopenConversation({ conversationId })).unwrap())}
+        onTakeOver={() => void runAction(() => dispatch(stopChatbot({ conversationId })).unwrap())}
+        onPriority={() => setOpenSheet('priority')}
+        onLabels={() => {
+          if (labelsStatus === 'idle' || labelsStatus === 'failed') void dispatch(loadLabels());
+          setOpenSheet('labels');
+        }}
+      />
+
+      <PrioritySheet
+        visible={openSheet === 'priority'}
+        value={thread?.priority ?? 'normal'}
+        busy={actionBusy}
+        onClose={() => setOpenSheet('conversation')}
+        onSelect={(priority: ConversationPriority) =>
+          void runAction(() => dispatch(setConversationPriority({ conversationId, priority })).unwrap())
+        }
+      />
+
+      {openSheet === 'labels' ? (
+      <LabelsSheet
+        visible
+        labels={labels}
+        status={labelsStatus}
+        selected={(thread?.labels ?? []).map((label) => label.id)}
+        busy={actionBusy}
+        onClose={() => setOpenSheet('conversation')}
+        onSave={(labelIds) =>
+          void runAction(() => dispatch(setConversationLabels({ conversationId, labelIds })).unwrap())
+        }
+      />
+      ) : null}
       </KeyboardAvoidingView>
     </Screen>
   );

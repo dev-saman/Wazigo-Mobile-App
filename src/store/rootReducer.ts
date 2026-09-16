@@ -4,6 +4,7 @@ import { authReducer } from '@/features/auth/authSlice';
 import { bootstrapReducer } from '@/features/bootstrap/bootstrapSlice';
 import { connectivityReducer } from '@/features/connectivity/connectivitySlice';
 import { conversationsReducer } from '@/features/conversations/conversationsSlice';
+import { labelsReducer } from '@/features/conversations/labelsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
 import { messagesReducer } from '@/features/messages/messagesSlice';
 import { templatesReducer } from '@/features/templates/templatesSlice';
@@ -17,6 +18,7 @@ const combined = combineReducers({
   connectivity: connectivityReducer,
   conversations: conversationsReducer,
   dashboard: dashboardReducer,
+  labels: labelsReducer,
   messages: messagesReducer,
   templates: templatesReducer,
 });
