@@ -80,3 +80,20 @@ export const Colors = {
 } as const;
 
 export type ColorToken = keyof typeof Colors;
+
+/**
+ * CSS gradient layers for React Native's `experimental_backgroundImage`, drawn
+ * over a solid token colour so a platform without gradient support still shows
+ * the brand green. The first layer is on top.
+ */
+export const Gradients = {
+  /**
+   * Design screen 1: Deep Green, lifted toward the top right, a soft Vivid Green
+   * band across the middle diagonal, and darker toward the bottom left.
+   */
+  splash: [
+    'linear-gradient(200deg, rgba(8, 183, 79, 0.18) 0%, rgba(8, 183, 79, 0) 45%)',
+    'linear-gradient(135deg, rgba(37, 211, 102, 0) 42%, rgba(37, 211, 102, 0.12) 57%, rgba(37, 211, 102, 0) 72%)',
+    'linear-gradient(20deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0) 50%)',
+  ].join(', '),
+} as const;
