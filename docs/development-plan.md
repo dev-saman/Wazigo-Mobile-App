@@ -7,7 +7,7 @@ sheets: Start here, Login, Chat, Dashboard, Live updates; last reviewed 2026-09-
 
 | Item | Version |
 | --- | --- |
-| Expo SDK | 57.0.22 (npm `latest`, stable) |
+| Expo SDK | 57.0.23 (57.0.22 at Stage 1; patch taken in Stage 14) |
 | React Native | 0.86.3 |
 | React | 19.2.3 |
 | Expo Router | 57.0.21 (routes in `src/app/`) |
@@ -140,8 +140,7 @@ Errors: `{status:false, message, errors?}`.
    the site root. Needed for Stage 13.
 2. **Reverb public app key** — no mobile config endpoint exists; the key must be supplied via
    `EXPO_PUBLIC_REVERB_APP_KEY`. Needed for Stage 13.
-3. **iOS bundle identifier / Android package name** — not set yet (store identities are
-   permanent). Needed before the first native build.
+3. ~~**iOS bundle identifier / Android package name**~~ — `io.wazigo.app` for both (Stage 14).
 4. ~~Mobile design reference~~ — received 2026-09-15 (see above).
 5. **OTP length** — default is 5 digits but deployment-configurable, and no API returns the
    configured length. Built configurable: `Config.otpLength` (`EXPO_PUBLIC_OTP_LENGTH`, default 5,
@@ -445,6 +444,26 @@ carries the app until those answers arrive, and presence.
   interface (no screen or slice may import the client), registered with `registerSessionCleanup`,
   and gated so it cannot connect until blocker 5 is fixed. The REST fallback stays underneath it.
 
+## Cleanup and handover (Stage 14)
+
+- **`expo-doctor` 21/21.** Took the two upstream patch releases (`expo` 57.0.22 -> 57.0.23,
+  `expo-image-picker` 57.0.17 -> 57.0.18); both changelogs record no user-facing changes. Lint,
+  typecheck, tests and both exports were re-run on the new versions.
+- `jest`, `jest-expo` and `@types/jest` moved from `dependencies` to `devDependencies` - they are
+  test tooling, not runtime code.
+- **iOS bundle identifier and Android package name: `io.wazigo.app`** (reverse DNS of wazigo.io,
+  decided 2026-09-16). They are permanent store identities; never change them after the first
+  store upload.
+- README rewritten: status (including what has *not* been verified), quick start, every
+  `EXPO_PUBLIC_*` value, the layering rule and the lint guards with their reasons, session,
+  permissions, live updates, and what the tests do and do not cover.
+- `docs/backend-blockers.md` written for the server team: each blocker with what the API does today,
+  what the app already does about it, what "fixed" looks like and how to verify it, plus the values
+  the app is still waiting for.
+- Swept for leftovers: no TODOs, no unguarded logging (network logging and cleanup warnings are
+  dev-only), no `any` or `@ts-ignore`.
+- Terms of Service / Privacy links: still no URLs, still omitted.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -460,7 +479,7 @@ carries the app until those answers arrive, and presence.
 11. Message states, retry, resolve/reopen, conversation actions ✔
 12. Offline, loading, session expired, access denied ✔
 13. REST fallback (foreground / reconnect refresh) + presence ✔ — socket deferred, see above
-14. Cleanup, lint, Expo Doctor, README, backend blockers doc
+14. Cleanup, lint, Expo Doctor, README, backend blockers doc ✔
 15. Commits + push
 
 ### Dependencies deferred until their stage (compatibility to be verified then)
