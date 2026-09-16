@@ -77,7 +77,8 @@ support them:
 | Templates / More tabs | Home, Chats | Mobile v1 tabs are Home + Chats only |
 | Pending replies, response rate, customer rating cards | Home | Not in DASH-01; use total / open / unread / window_open |
 | Recent conversations "See all" business list | Home | Dashboard must stay personal; chats live in the Chats tab |
-| "Awaiting" filter chip | Chats | No matching CHAT-01 filter; using All / Open / Unread / Priority |
+| "Awaiting" filter chip | Chats | No matching CHAT-01 filter; chips are Mine / Unread / Open / Urgent / Unassigned |
+| Counts on the filter chips | Chats | CHAT-01 returns `meta.total` for the current query only; per-chip counts would need one request per chip |
 | Customer "Online" / last-seen | Conversation | No customer presence field in Conversation resource |
 | Call button | Conversation | No calling API |
 | Location, Contact attachments | Attachment sheet | CHAT-04 supports image / document / audio / video only |
@@ -234,6 +235,39 @@ src/app/
 - **DASH-01 remains a backend blocker**: the figures still count every chat on every number the
   user can reach. That is a server fix; filtering here would only hide the discrepancy.
 
+## Chats list (Stage 7)
+
+- `src/features/conversations/` — slice (`idle|loading|refreshing|loadingMore|ready|failed`, items,
+  `filter`, `search`, `page`, `lastPage`, `total`), `loadConversations({refresh})` and
+  `loadMoreConversations()`. Rows live in `src/components/chat/`.
+- **Every chip is a CHAT-01 query, never a local filter:**
+
+  | Chip | Params |
+  | --- | --- |
+  | Mine (default) | `assigned=mine` |
+  | Unread | `assigned=mine&unread=1` |
+  | Open | `assigned=mine&status=open` |
+  | Urgent | `assigned=mine&priority=urgent` |
+  | Unassigned | `assigned=unassigned` |
+
+  `assigned=mine` is the closest the API has to the personal list this app promises, so it is the
+  default scope; blocker 1 (CHAT-01 returning own + unassigned) still needs the server fix.
+  The design's single "Priority" idea became "Urgent" because CHAT-01 takes one priority value.
+- Search is the `search=` parameter, debounced 350 ms. **One list request is in flight at a time**:
+  a new chip, term or refresh aborts the previous call through the request `signal`, so a slow
+  reply cannot land on top of a newer one. A cancelled request is not a failure.
+- Paging: `per_page=20`, `onEndReached` only while `current_page < last_page`. Pages are merged by
+  id, so a row that shifts between pages is never listed twice; page 1 always replaces.
+- A failed refresh or next page keeps the rows already listed and reports the error; only an empty
+  list falls through to the error screen.
+- `FlatList`, not FlashList: adding a list dependency that cannot be verified on a device this
+  stage is not worth the risk on SDK 57 / RN 0.86. Revisit if long lists stutter in testing.
+- Timestamps go through `src/utils/datetime.ts`, which applies IST as a fixed +05:30 offset rather
+  than `Intl`: Hermes' ICU data varies by platform, and a missing time zone would silently use the
+  device's, putting messages on the wrong day. Screen readers get the full date and time, not `3h`.
+- Rows are not pressable yet - the thread screen arrives in Stage 8, and a button that goes nowhere
+  is worse than plain text for a screen reader.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -242,7 +276,7 @@ src/app/
 4. Splash, Login (OTP + password), OTP verification ✔
 5. `/me/bootstrap`, permissions, session restore ✔
 6. Personal dashboard ✔
-7. Chats list, search, filters, pagination
+7. Chats list, search, filters, pagination ✔
 8. Message history, older-page loading, mark read
 9. Send text + media
 10. Reply window + templates

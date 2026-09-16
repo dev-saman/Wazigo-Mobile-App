@@ -3,7 +3,7 @@
  * IDs in comments refer to the API Reference workbook.
  */
 import { API } from './endpoints';
-import { network, type UploadOptions } from './network';
+import { network, type RequestOptions, type UploadOptions } from './network';
 import type {
   AuthUser,
   BootstrapPayload,
@@ -89,8 +89,10 @@ export const getDashboardOverview = () => network.get<DashboardOverview>(API.das
 // --- Conversations --------------------------------------------------------------
 
 /** CHAT-01 — BACKEND BLOCKER: personal assignment scope must be enforced server-side. */
-export const getConversations = (params: ConversationListParams = {}) =>
-  network.get<Conversation[], PaginationMeta>(API.conversations.list, { params });
+export const getConversations = (
+  params: ConversationListParams = {},
+  options?: Pick<RequestOptions, 'signal'>,
+) => network.get<Conversation[], PaginationMeta>(API.conversations.list, { params, ...options });
 
 /** CHAT-02 — newest-first page; `meta.conversation` holds the thread. */
 export const getConversationMessages = (conversationId: Id, params: PageParams = {}) =>
