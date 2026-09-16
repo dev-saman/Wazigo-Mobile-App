@@ -1,11 +1,16 @@
+export { AttachmentSheet } from './AttachmentSheet';
 export { ChatFilterChips } from './ChatFilterChips';
 export { ChatSearchField } from './ChatSearchField';
 export { ConversationRow } from './ConversationRow';
 export { DaySeparator, dayLabel } from './DaySeparator';
+export { MediaAttachment } from './MediaAttachment';
 export { MessageBubble } from './MessageBubble';
+export { MessageComposer } from './MessageComposer';
 export { MessageTick } from './MessageTick';
 export { ThreadHeader } from './ThreadHeader';
+export type { AttachmentChoice, AttachmentSheetProps } from './AttachmentSheet';
 export type { ChatFilterChipsProps } from './ChatFilterChips';
 export type { ConversationRowProps } from './ConversationRow';
 export type { MessageBubbleProps } from './MessageBubble';
+export type { MessageComposerProps } from './MessageComposer';
 export type { ThreadHeaderProps } from './ThreadHeader';

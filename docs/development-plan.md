@@ -82,6 +82,7 @@ support them:
 | Customer "Online" / last-seen | Conversation | No customer presence field in Conversation resource |
 | Call button | Conversation | No calling API |
 | Location, Contact attachments | Attachment sheet | CHAT-04 supports image / document / audio / video only |
+| Opening a document, playing a video or audio | Conversation | Needs a viewer/player or sharing dependency that has not been chosen; the file is named instead |
 | Star, Mute, Archive, Report, Block actions | Conversation actions | No endpoints; using resolve / reopen / priority / labels / bot take-over |
 | Start a Conversation | Empty state | No outbound conversation creation in phase 1 |
 
@@ -293,6 +294,35 @@ src/app/
 - **Known limitation:** threads stay in memory for the session. Fine for phase 1; if it ever
   matters, evict all but the last few on `appReset` or on a memory warning.
 
+## Sending and media (Stage 9)
+
+- `src/features/messages/sendThunks.ts` — `sendText` (CHAT-03) and `sendMedia` (CHAT-04);
+  `src/services/media/picker.ts` (pick + validate) and `mediaCache.ts` (authenticated download).
+  UI: `MessageComposer`, `AttachmentSheet`, `MediaAttachment`.
+- **Optimistic, and nothing typed is ever lost.** A send appears immediately with a **negative
+  local id** (so it can never collide with a server id) and `status:"pending"`; the 201 response
+  replaces it in place; a failure marks it `failed` and leaves it there for Stage 11's retry.
+  Unsent messages also **survive a thread reload**, which matters because of the next point.
+- **409 = reassigned while open.** Retrying would fail the same way, so the thread is reloaded to
+  show the truth, and the failed message stays visible on top of the refreshed history.
+- Limits are enforced before the request: text `slice(0, 4096)`, caption `slice(0, 1024)`, and the
+  **50 MB ceiling is checked in the picker** so a large file is refused before a byte is uploaded.
+- The composer is **hidden**, not disabled, without `conversations.send` - a send box that always
+  fails is worse than none. It is disabled while offline.
+- The attachment sheet is a plain `Modal`: a gesture-driven sheet library cannot be verified
+  against Reanimated 4.5 / RN 0.86 here, and three buttons do not need one. Photo/video share the
+  library picker; audio is only reachable by picking an audio file, which is typed from its MIME.
+- **Media is never a public URL.** CHAT-05 streams bytes behind the same bearer token, so
+  `mediaCache.ts` (the only file allowed to import `expo-file-system`, ESLint-enforced) downloads
+  with `network.authorizedRequest()` headers into the cache directory, once per file, and the
+  cache is cleared on logout with the rest of the session.
+- `media.pending === true` means the server is still fetching from WhatsApp: the bubble says so
+  rather than showing an error.
+- **Images are downloaded and shown inline. Video, audio and documents are named only** - opening
+  or playing them needs a dependency that has not been chosen yet, and a button that cannot work
+  is worse than none. Decide before release.
+- app.json now carries the iOS camera and photo-library permission strings.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -303,7 +333,7 @@ src/app/
 6. Personal dashboard ✔
 7. Chats list, search, filters, pagination ✔
 8. Message history, older-page loading, mark read ✔
-9. Send text + media
+9. Send text + media ✔
 10. Reply window + templates
 11. Message states, retry, resolve/reopen, conversation actions
 12. Offline, loading, session expired, access denied
@@ -314,6 +344,6 @@ src/app/
 ### Dependencies deferred until their stage (compatibility to be verified then)
 - Bottom sheet library (verify against Reanimated 4.5 / RN 0.86) — Stage 9/11
 - Pusher-compatible client for Reverb — Stage 13
-- `expo-file-system` for authenticated media download — Stage 8/9
+- ~~`expo-file-system` for authenticated media download~~ — installed in Stage 9 (57.0.7)
 - FlashList (only if stable on SDK 57) — Stage 7
 - Date/time-zone utility — Stage 6

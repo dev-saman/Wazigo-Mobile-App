@@ -28,7 +28,14 @@
           "imageWidth": 88
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wazigo uses your photos so you can send them to customers on WhatsApp.",
+          "cameraPermission": "Wazigo uses the camera so you can send a photo to customers on WhatsApp."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

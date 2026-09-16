@@ -14,6 +14,8 @@ export type ThreadStatus =
 export type ThreadState = {
   /** Newest first, exactly as CHAT-02 returns them (the list renders inverted). */
   items: Message[];
+  /** Upload progress 0-1 for messages still being sent, keyed by message id. */
+  uploads: Record<string, number>;
   status: ThreadStatus;
   error: ApiError | null;
   page: number;
@@ -27,20 +29,29 @@ export type MessagesState = {
   byConversation: Record<string, ThreadState>;
 };
 
-const emptyThread: ThreadState = {
+/**
+ * A brand new thread every time. This must not be a spread of a shared object:
+ * the arrays would be shared too, and once Immer freezes the first thread every
+ * later one would be unable to accept a message.
+ */
+const createThread = (): ThreadState => ({
   items: [],
+  uploads: {},
   status: 'idle',
   error: null,
   page: 0,
   lastPage: 1,
   total: 0,
   conversation: null,
-};
+});
+
+/** Read-only default for selectors, so an unopened thread is never undefined. */
+const emptyThread: ThreadState = Object.freeze(createThread());
 
 const initialState: MessagesState = { byConversation: {} };
 
 const threadOf = (state: MessagesState, id: string): ThreadState => {
-  state.byConversation[id] ??= { ...emptyThread };
+  state.byConversation[id] ??= createThread();
   return state.byConversation[id];
 };
 
@@ -73,7 +84,10 @@ const messagesSlice = createSlice({
     ) {
       const { conversationId, items, page, lastPage, total, older, conversation } = action.payload;
       const thread = threadOf(state, conversationId);
-      thread.items = older ? mergeOlder(thread.items, items) : items;
+      // Messages that have not reached the server yet (negative ids) survive a
+      // reload: a refresh must never throw away what someone typed.
+      const unsent = older ? [] : thread.items.filter((item) => item.id < 0);
+      thread.items = older ? mergeOlder(thread.items, items) : [...unsent, ...items];
       thread.page = page;
       thread.lastPage = lastPage;
       thread.total = total;
@@ -86,6 +100,51 @@ const messagesSlice = createSlice({
       thread.error = action.payload.error;
       // A failed older page keeps whatever is already on screen.
       thread.status = thread.items.length > 0 ? 'ready' : 'failed';
+    },
+    /**
+     * An outbound message the user has just sent, shown before the server has
+     * confirmed it. Local ids are negative, so they can never collide with a
+     * server id and are easy to recognise.
+     */
+    messageQueued(state, action: PayloadAction<{ conversationId: string; message: Message }>) {
+      const thread = threadOf(state, action.payload.conversationId);
+      thread.items.unshift(action.payload.message);
+      if (thread.status === 'idle' || thread.status === 'failed') thread.status = 'ready';
+    },
+    /** 201: the server's Message replaces the local one, keeping its position. */
+    messageSent(
+      state,
+      action: PayloadAction<{ conversationId: string; localId: number; message: Message }>,
+    ) {
+      const thread = threadOf(state, action.payload.conversationId);
+      const index = thread.items.findIndex((item) => item.id === action.payload.localId);
+      if (index >= 0) thread.items[index] = action.payload.message;
+      else thread.items.unshift(action.payload.message);
+      delete thread.uploads[String(action.payload.localId)];
+      thread.total += 1;
+    },
+    /**
+     * The send failed. The message stays exactly where it is: what someone
+     * typed is never thrown away, and Stage 11 adds retry on top of this.
+     */
+    messageFailed(
+      state,
+      action: PayloadAction<{ conversationId: string; localId: number; detail?: string }>,
+    ) {
+      const thread = threadOf(state, action.payload.conversationId);
+      const message = thread.items.find((item) => item.id === action.payload.localId);
+      if (message) {
+        message.status = 'failed';
+        message.error_detail = action.payload.detail ?? null;
+      }
+      delete thread.uploads[String(action.payload.localId)];
+    },
+    uploadProgress(
+      state,
+      action: PayloadAction<{ conversationId: string; localId: number; fraction: number }>,
+    ) {
+      const thread = threadOf(state, action.payload.conversationId);
+      thread.uploads[String(action.payload.localId)] = action.payload.fraction;
     },
     /** CHAT-06 and later the message actions return the updated Conversation. */
     threadConversationUpdated(
@@ -100,8 +159,16 @@ const messagesSlice = createSlice({
   },
 });
 
-export const { threadLoading, threadLoaded, threadFailed, threadConversationUpdated } =
-  messagesSlice.actions;
+export const {
+  threadLoading,
+  threadLoaded,
+  threadFailed,
+  threadConversationUpdated,
+  messageQueued,
+  messageSent,
+  messageFailed,
+  uploadProgress,
+} = messagesSlice.actions;
 
 export const messagesReducer = messagesSlice.reducer;
 export { emptyThread };

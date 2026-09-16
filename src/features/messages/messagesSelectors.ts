@@ -27,3 +27,7 @@ export const selectHasOlderMessages = (conversationId: string) => (state: RootSt
   const thread = state.messages.byConversation[conversationId];
   return !!thread && thread.page > 0 && thread.page < thread.lastPage;
 };
+
+/** Upload progress (0-1) for a message still being sent, or undefined. */
+export const selectUploadProgress = (conversationId: string, messageId: number) => (state: RootState) =>
+  state.messages.byConversation[conversationId]?.uploads[String(messageId)];

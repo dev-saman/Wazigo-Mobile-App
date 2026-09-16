@@ -12,6 +12,10 @@ const restricted = {
     name: '@react-native-async-storage/async-storage',
     message: 'Use src/services/storage/appStorage.ts (non-sensitive data only).',
   },
+  fileSystem: {
+    name: 'expo-file-system',
+    message: 'Use src/services/media/mediaCache.ts so downloads stay authenticated and cached.',
+  },
 };
 
 const restrictImports = (...paths) => ({ 'no-restricted-imports': ['error', { paths }] });
@@ -22,19 +26,28 @@ module.exports = defineConfig([
     ignores: ['dist/*'],
   },
   {
-    rules: restrictImports(restricted.axios, restricted.secureStore, restricted.asyncStorage),
+    rules: restrictImports(
+      restricted.axios,
+      restricted.secureStore,
+      restricted.asyncStorage,
+      restricted.fileSystem,
+    ),
   },
   {
     files: ['src/api/network.ts'],
-    rules: restrictImports(restricted.secureStore, restricted.asyncStorage),
+    rules: restrictImports(restricted.secureStore, restricted.asyncStorage, restricted.fileSystem),
+  },
+  {
+    files: ['src/services/media/mediaCache.ts'],
+    rules: restrictImports(restricted.axios, restricted.secureStore, restricted.asyncStorage),
   },
   {
     files: ['src/services/storage/tokenStorage.ts'],
-    rules: restrictImports(restricted.axios, restricted.asyncStorage),
+    rules: restrictImports(restricted.axios, restricted.asyncStorage, restricted.fileSystem),
   },
   {
     files: ['src/services/storage/appStorage.ts'],
-    rules: restrictImports(restricted.axios, restricted.secureStore),
+    rules: restrictImports(restricted.axios, restricted.secureStore, restricted.fileSystem),
   },
   {
     // Tests mock native modules and load isolated module graphs.

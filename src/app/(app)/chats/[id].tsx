@@ -1,25 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { Permissions } from '@/api/types';
-import { DaySeparator, MessageBubble, ThreadHeader } from '@/components/chat';
+import {
+  AttachmentSheet,
+  DaySeparator,
+  MessageBubble,
+  MessageComposer,
+  ThreadHeader,
+  type AttachmentChoice,
+} from '@/components/chat';
 import { Screen } from '@/components/common';
 import { ListFooterLoader, StateView } from '@/components/feedback';
 import { Colors, Spacing } from '@/constants/theme';
-import { AccessDeniedView, RequirePermission } from '@/features/bootstrap';
+import { AccessDeniedView, RequirePermission, usePermission } from '@/features/bootstrap';
+import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import { markConversationRead, selectConversationById } from '@/features/conversations';
 import {
   buildThreadRows,
   loadOlderMessages,
   loadThread,
   selectHasOlderMessages,
+  selectThread,
   selectThreadConversation,
   selectThreadError,
   selectThreadMessages,
   selectThreadStatus,
+  sendMedia,
+  sendText,
   type ThreadRow,
 } from '@/features/messages';
+import { pickDocument, pickFromCamera, pickFromLibrary } from '@/services/media/picker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 const Copy = {
@@ -32,6 +44,8 @@ const Copy = {
   missingDescription: 'This conversation is no longer available.',
   retry: 'Retry',
   back: 'Back to chats',
+  attachmentFailed: 'Attachment',
+  offlineComposer: 'You are offline',
 };
 
 function ThreadScreen({ conversationId }: { conversationId: string }) {
@@ -43,6 +57,14 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const hasOlder = useAppSelector(selectHasOlderMessages(conversationId));
   // The listed row fills the header while the first page is still loading.
   const listed = useAppSelector(selectConversationById(conversationId));
+
+  const uploads = useAppSelector(selectThread(conversationId)).uploads;
+  const offline = useAppSelector(selectIsOffline);
+  const canSend = usePermission(Permissions.conversationsSend);
+
+  const [draft, setDraft] = useState('');
+  const [attaching, setAttaching] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const markedRead = useRef(false);
 
@@ -72,8 +94,54 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
 
   const renderItem = useCallback(
     ({ item }: { item: ThreadRow }) =>
-      item.kind === 'message' ? <MessageBubble message={item.message} /> : <DaySeparator ms={item.ms} />,
-    [],
+      item.kind === 'message' ? (
+        <MessageBubble
+          message={item.message}
+          conversationId={conversationId}
+          progress={uploads[String(item.message.id)]}
+        />
+      ) : (
+        <DaySeparator ms={item.ms} />
+      ),
+    [conversationId, uploads],
+  );
+
+  const onSend = useCallback(() => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    void dispatch(sendText({ conversationId, text }));
+  }, [conversationId, dispatch, draft]);
+
+  /**
+   * Whatever is in the composer travels with the attachment as its caption,
+   * which is how WhatsApp itself behaves.
+   */
+  const onAttachment = useCallback(
+    async (choice: AttachmentChoice) => {
+      setSheetOpen(false);
+      setAttaching(true);
+      try {
+        const result =
+          choice === 'camera'
+            ? await pickFromCamera()
+            : choice === 'document'
+              ? await pickDocument()
+              : await pickFromLibrary();
+
+        if (!result.ok) {
+          if (result.reason !== 'cancelled') Alert.alert(Copy.attachmentFailed, result.message);
+          return;
+        }
+
+        const caption = draft.trim();
+        setDraft('');
+        void dispatch(sendMedia({ conversationId, type: result.type, file: result.file, caption }));
+      } finally {
+        setAttaching(false);
+      }
+    },
+    [conversationId, dispatch, draft],
   );
 
   const header = <ThreadHeader conversation={conversation ?? listed} onBack={goBack} />;
@@ -108,6 +176,10 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
 
   return (
     <Screen background="chatBackground" edges={['top', 'bottom']} padded={false}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       {header}
 
       {loading ? (
@@ -135,6 +207,27 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
           keyboardShouldPersistTaps="handled"
         />
       )}
+
+      {/* No permission, no composer: a send box that always fails is worse
+          than none. The reply window and templates arrive in Stage 10. */}
+      {canSend ? (
+        <MessageComposer
+          value={draft}
+          onChangeText={setDraft}
+          onSend={onSend}
+          onAttach={() => setSheetOpen(true)}
+          disabled={offline}
+          sending={attaching}
+          placeholder={offline ? Copy.offlineComposer : undefined}
+        />
+      ) : null}
+
+      <AttachmentSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onSelect={(choice) => void onAttachment(choice)}
+      />
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -165,6 +258,7 @@ export default function ConversationRoute() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   list: { paddingVertical: Spacing.md, backgroundColor: Colors.chatBackground },
   centre: { flex: 1, justifyContent: 'center' },
 });

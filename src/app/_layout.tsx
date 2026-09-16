@@ -10,6 +10,8 @@ import { selectAuthStatus } from '@/features/auth/authSelectors';
 import { restoreSession } from '@/features/auth/authThunks';
 import { SplashView } from '@/features/auth/components/SplashView';
 import { useConnectivityMonitor } from '@/features/connectivity/useConnectivityMonitor';
+import { clearMediaCache } from '@/services/media/mediaCache';
+import { registerSessionCleanup } from '@/services/session/sessionCleanup';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { store } from '@/store/store';
 
@@ -25,6 +27,9 @@ function AppShell() {
   useEffect(() => {
     if (status === 'unknown') void dispatch(restoreSession());
   }, [dispatch, status]);
+
+  // Downloaded media is private to the session, so logout and expiry clear it.
+  useEffect(() => registerSessionCleanup(clearMediaCache), []);
 
   // The brand splash stands in for the navigator until the stored session has
   // been checked, so no screen from either group can flash first.
