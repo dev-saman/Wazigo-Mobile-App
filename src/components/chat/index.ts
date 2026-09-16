@@ -14,6 +14,7 @@ export { PrioritySheet } from './PrioritySheet';
 export { ReplyWindowBanner } from './ReplyWindowBanner';
 export { TemplateListItem } from './TemplateListItem';
 export { ThreadHeader } from './ThreadHeader';
+export { ThreadSkeleton } from './ThreadSkeleton';
 export type { AttachmentChoice, AttachmentSheetProps } from './AttachmentSheet';
 export type { ChatFilterChipsProps } from './ChatFilterChips';
 export type { ConversationRowProps } from './ConversationRow';

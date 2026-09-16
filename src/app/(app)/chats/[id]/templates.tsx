@@ -13,10 +13,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { MessageLimits, Permissions, type MessageTemplate } from '@/api/types';
 import { ChatSearchField, TemplateListItem } from '@/components/chat';
 import { AppText, Button, Card, IconButton, Screen } from '@/components/common';
-import { ListFooterLoader, SkeletonList, StateView } from '@/components/feedback';
+import {
+  ErrorState,
+  ListFooterLoader,
+  SkeletonList,
+  StaleDataBanner,
+  StateView,
+} from '@/components/feedback';
 import { TextField } from '@/components/forms';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { RequirePermission, usePermission } from '@/features/bootstrap';
+import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import { sendTemplate } from '@/features/messages';
 import {
   loadMoreTemplates,
@@ -44,16 +51,16 @@ const Copy = {
   emptyDescription: 'Templates are created and approved in the Wazigo dashboard.',
   noMatchTitle: 'No matching templates',
   noMatchDescription: 'Try a different search term.',
-  offlineTitle: 'You are offline',
-  offlineDescription: 'Please check your internet connection and try again.',
   failedTitle: 'We could not load your templates',
-  retry: 'Retry',
+  retryLabel: 'Retry loading your templates',
+  stale: 'Showing the templates we already loaded',
   preview: 'Preview',
   header: 'Header',
   body: 'Message',
   send: 'Send template',
   changeTemplate: 'Choose a different template',
   noPermission: 'You do not have permission to send templates.',
+  offlineSend: 'You need an internet connection to send a template.',
 };
 
 const errorFor = (errors: TemplateParamError[], section: 'header' | 'body', index: number) =>
@@ -71,6 +78,7 @@ function TemplateForm({
 }) {
   const dispatch = useAppDispatch();
   const canSend = usePermission(Permissions.templatesSend);
+  const offline = useAppSelector(selectIsOffline);
 
   const headerLabels = useMemo(() => parameterLabels(template, 'header'), [template]);
   const bodyLabels = useMemo(() => parameterLabels(template, 'body'), [template]);
@@ -86,6 +94,9 @@ function TemplateForm({
     values.map((current, position) => (position === index ? value : current));
 
   const submit = () => {
+    // Sending offline would only queue an optimistic bubble that fails.
+    if (offline) return;
+
     const found = [
       ...validateParameters(headerValues, 'header'),
       ...validateParameters(bodyValues, 'body'),
@@ -151,7 +162,20 @@ function TemplateForm({
         </Card>
 
         {canSend ? (
-          <Button title={Copy.send} icon="send" onPress={submit} />
+          <>
+            <Button
+              title={Copy.send}
+              icon="send"
+              onPress={submit}
+              disabled={offline}
+              accessibilityHint={offline ? Copy.offlineSend : undefined}
+            />
+            {offline ? (
+              <AppText variant="caption" color="textSecondary" align="center">
+                {Copy.offlineSend}
+              </AppText>
+            ) : null}
+          </>
         ) : (
           <AppText variant="bodySmall" color="error" align="center">
             {Copy.noPermission}
@@ -196,7 +220,6 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
     [],
   );
 
-  const offline = !!error?.isOffline;
   const narrowed = search.length > 0;
 
   return (
@@ -216,20 +239,21 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
         />
       ) : status === 'loading' ? (
         <View style={styles.skeleton}>
-          <SkeletonList rows={6} />
+          <SkeletonList rows={6} avatar={false} label="Loading your templates" />
         </View>
       ) : status === 'failed' ? (
-        <StateView
-          icon={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-          tone={offline ? 'neutral' : 'error'}
-          title={offline ? Copy.offlineTitle : Copy.failedTitle}
-          description={offline ? Copy.offlineDescription : error?.message}
-          actionLabel={Copy.retry}
-          onAction={() => void dispatch(loadTemplates())}
+        <ErrorState
+          error={error}
+          title={Copy.failedTitle}
+          onRetry={() => void dispatch(loadTemplates())}
+          retryAccessibilityLabel={Copy.retryLabel}
         />
       ) : (
         <>
           <ChatSearchField value={term} onChangeText={setTerm} placeholder="Search templates" />
+          <View style={styles.stale}>
+            <StaleDataBanner error={error} title={Copy.stale} />
+          </View>
           <FlatList
             data={templates}
             keyExtractor={(item) => String(item.id)}
@@ -242,7 +266,9 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
               if (hasMore) void dispatch(loadMoreTemplates());
             }}
             onEndReachedThreshold={0.4}
-            ListFooterComponent={<ListFooterLoader visible={status === 'loadingMore'} />}
+            ListFooterComponent={
+              <ListFooterLoader visible={status === 'loadingMore'} label="Loading more templates" />
+            }
             refreshControl={
               <RefreshControl
                 refreshing={status === 'refreshing'}
@@ -304,6 +330,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { flex: 1 },
   skeleton: { paddingHorizontal: Layout.screenPadding, paddingTop: Spacing.sm },
+  stale: { paddingHorizontal: Layout.screenPadding },
   listContent: { paddingBottom: Spacing.xxl },
   emptyContent: { flexGrow: 1 },
   form: {

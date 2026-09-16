@@ -31,6 +31,8 @@ export type ButtonProps = {
   fullWidth?: boolean;
   icon?: ComponentProps<typeof Ionicons>['name'];
   iconRight?: ReactNode;
+  /** Overrides the title for screen readers, e.g. "Retry loading your chats". */
+  accessibilityLabel?: string;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -46,6 +48,7 @@ export function Button({
   fullWidth = true,
   icon,
   iconRight,
+  accessibilityLabel,
   accessibilityHint,
   style,
   testID,
@@ -61,7 +64,7 @@ export function Button({
       onPress={onPress}
       disabled={inactive}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
       style={({ pressed }) => [

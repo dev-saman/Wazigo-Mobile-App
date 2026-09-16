@@ -23,8 +23,7 @@ const Copy = {
   resend: 'Resend code',
   noCode: 'Did not receive the code?',
   resent: 'We have sent a new code.',
-  offline: 'You are offline',
-  offlineDetail: 'Check your internet connection to verify the code.',
+  offlineHint: 'You need an internet connection to verify the code.',
   back: 'Back to sign in',
 };
 
@@ -127,17 +126,10 @@ export default function OtpScreen() {
             {`We have sent a ${Config.otpLength}-digit code to ${formatPhoneForDisplay(phone)} on WhatsApp. It is valid for ${Config.otpValidityMinutes} minutes.`}
           </AppText>
 
-          {challenge.notice || offline || info || error ? (
+          {/* Offline is reported once by the global strip in `Screen`. */}
+          {challenge.notice || info || error ? (
             <View style={styles.banners}>
               {challenge.notice ? <Banner tone="info" title={challenge.notice} /> : null}
-              {offline ? (
-                <Banner
-                  tone="warning"
-                  icon="cloud-offline-outline"
-                  title={Copy.offline}
-                  description={Copy.offlineDetail}
-                />
-              ) : null}
               {info && !error ? (
                 <Banner tone="success" icon="checkmark-circle-outline" title={info} />
               ) : null}
@@ -163,8 +155,14 @@ export default function OtpScreen() {
             onPress={() => void verify(code)}
             loading={verifying}
             disabled={offline || code.length < Config.otpLength}
+            accessibilityHint={offline ? Copy.offlineHint : undefined}
             style={styles.submit}
           />
+          {offline ? (
+            <AppText variant="caption" color="textSecondary" align="center" style={styles.hint}>
+              {Copy.offlineHint}
+            </AppText>
+          ) : null}
 
           <View style={styles.resend}>
             <AppText variant="caption" color="textSecondary">
@@ -209,6 +207,7 @@ const styles = StyleSheet.create({
   header: { alignItems: 'flex-start', marginBottom: Spacing.xl },
   subtitle: { marginTop: Spacing.sm, marginBottom: Spacing.xxl },
   banners: { gap: Spacing.sm, marginBottom: Spacing.xl },
+  hint: { marginTop: Spacing.sm },
   submit: { marginTop: Spacing.xxl },
   resend: {
     flexDirection: 'row',

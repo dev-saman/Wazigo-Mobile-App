@@ -16,8 +16,7 @@ import { AppText, BrandLogo, Button, IconButton, Screen } from '@/components/com
 import { Banner } from '@/components/feedback';
 import { PhoneField, TextField } from '@/components/forms';
 import { Colors, Layout, Spacing } from '@/constants/theme';
-import { selectOtpChallenge, selectSessionExpired } from '@/features/auth/authSelectors';
-import { sessionExpiredAcknowledged } from '@/features/auth/authSlice';
+import { selectOtpChallenge } from '@/features/auth/authSelectors';
 import { requestLoginOtp, signInWithPassword } from '@/features/auth/authThunks';
 import { authErrorMessage, authFieldErrors } from '@/features/auth/errors';
 import { loginFormSchema, ValidationMessages, type LoginFormValues } from '@/features/auth/validation';
@@ -38,17 +37,13 @@ const Copy = {
   usePassword: 'Sign in with password',
   useOtp: 'Use a one-time code instead',
   otpHint: 'We will send a login code to this number on WhatsApp.',
-  offline: 'You are offline',
-  offlineDetail: 'Check your internet connection to sign in.',
-  expired: 'Session expired',
-  expiredDetail: 'For your security, please sign in again.',
+  offlineHint: 'You need an internet connection to sign in.',
   or: 'or',
 };
 
 export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const offline = useAppSelector(selectIsOffline);
-  const sessionExpired = useAppSelector(selectSessionExpired);
   const challenge = useAppSelector(selectOtpChallenge);
 
   const [formError, setFormError] = useState<string | null>(null);
@@ -78,7 +73,6 @@ export default function LoginScreen() {
     }
 
     setFormError(null);
-    if (sessionExpired) dispatch(sessionExpiredAcknowledged());
 
     try {
       if (values.mode === 'password') {
@@ -130,20 +124,11 @@ export default function LoginScreen() {
             {Copy.subtitle}
           </AppText>
 
-          {sessionExpired || offline || formError ? (
+          {/* Offline is reported once by the global strip in `Screen`; this
+              screen only says what that means for signing in. */}
+          {formError ? (
             <View style={styles.banners}>
-              {sessionExpired ? (
-                <Banner tone="warning" title={Copy.expired} description={Copy.expiredDetail} />
-              ) : null}
-              {offline ? (
-                <Banner
-                  tone="warning"
-                  icon="cloud-offline-outline"
-                  title={Copy.offline}
-                  description={Copy.offlineDetail}
-                />
-              ) : null}
-              {formError ? <Banner tone="error" title={formError} /> : null}
+              <Banner tone="error" title={formError} />
             </View>
           ) : null}
 
@@ -208,8 +193,14 @@ export default function LoginScreen() {
             onPress={() => void submit()}
             loading={busy}
             disabled={offline}
+            accessibilityHint={offline ? Copy.offlineHint : undefined}
             style={styles.submit}
           />
+          {offline ? (
+            <AppText variant="caption" color="textSecondary" align="center" style={styles.hint}>
+              {Copy.offlineHint}
+            </AppText>
+          ) : null}
 
           <View style={styles.divider}>
             <View style={styles.rule} />
@@ -248,6 +239,7 @@ const styles = StyleSheet.create({
   banners: { gap: Spacing.sm, marginBottom: Spacing.lg },
   field: { marginBottom: Spacing.lg },
   submit: { marginTop: Spacing.sm },
+  hint: { marginTop: Spacing.sm },
   divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginVertical: Spacing.xl },
   rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },
 });

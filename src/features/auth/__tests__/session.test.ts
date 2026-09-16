@@ -27,6 +27,7 @@ import { registerSessionCleanup } from '@/services/session/sessionCleanup';
 import { sessionEvents } from '@/services/session/sessionEvents';
 import { store } from '@/store/store';
 
+import { sessionExpiredAcknowledged } from '../authSlice';
 import { signInWithOtp, signOut } from '../authThunks';
 
 const session = {
@@ -106,4 +107,38 @@ it('an expired-session event resets Redux and flags Session Expired', async () =
     otpChallenge: null,
   });
   expect(mockSecureStore.size).toBe(0);
+});
+
+it('acknowledging Session Expired leaves a clean signed-out state for Login', async () => {
+  await store.dispatch(signInWithOtp({ phone: '+919876543210', code: '12345' })).unwrap();
+  sessionEvents.emit('expired', { reason: 'refresh_failed' });
+  await flush();
+  await flush();
+
+  // The screen's only job: clear the flag so the guard reopens Login.
+  store.dispatch(sessionExpiredAcknowledged());
+
+  expect(store.getState().auth).toEqual({
+    status: 'unauthenticated',
+    user: null,
+    sessionExpired: false,
+    otpChallenge: null,
+  });
+});
+
+it('a second expiry while the screen is up does not clear the flag again', async () => {
+  const cleanup = jest.fn();
+  const unregister = registerSessionCleanup(cleanup);
+  await store.dispatch(signInWithOtp({ phone: '+919876543210', code: '12345' })).unwrap();
+
+  sessionEvents.emit('expired', { reason: 'refresh_failed' });
+  await flush();
+  await flush();
+  sessionEvents.emit('expired', { reason: 'refresh_failed' });
+  await flush();
+  await flush();
+
+  expect(cleanup).toHaveBeenCalledTimes(1);
+  expect(store.getState().auth.sessionExpired).toBe(true);
+  unregister();
 });

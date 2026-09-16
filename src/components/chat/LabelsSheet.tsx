@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { Label } from '@/api/types';
 import { AppText, Button, Sheet, SheetAction } from '@/components/common';
-import { Skeleton } from '@/components/feedback';
+import { Skeleton, StateCopy } from '@/components/feedback';
 import { Spacing } from '@/constants/theme';
 
 const Copy = {
@@ -23,6 +23,7 @@ export type LabelsSheetProps = {
   onClose: () => void;
   onSave: (labelIds: number[]) => void;
   busy?: boolean;
+  offline?: boolean;
 };
 
 /**
@@ -40,6 +41,7 @@ export function LabelsSheet({
   onClose,
   onSave,
   busy = false,
+  offline = false,
 }: LabelsSheetProps) {
   const [chosen, setChosen] = useState<number[]>(selected);
 
@@ -47,7 +49,12 @@ export function LabelsSheet({
     setChosen((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
 
   return (
-    <Sheet visible={visible} title={Copy.title} onClose={onClose}>
+    <Sheet
+      visible={visible}
+      title={Copy.title}
+      onClose={onClose}
+      notice={offline ? StateCopy.offlineAction : undefined}
+    >
       {status === 'loading' ? (
         <View style={styles.loading}>
           <Skeleton height={20} />
@@ -70,7 +77,7 @@ export function LabelsSheet({
               icon="pricetag-outline"
               label={label.name}
               selected={chosen.includes(label.id)}
-              disabled={busy}
+              disabled={busy || offline}
               onPress={() => toggle(label.id)}
             />
           ))}
@@ -78,7 +85,13 @@ export function LabelsSheet({
           <AppText variant="caption" color="textMuted" style={styles.message}>
             {Copy.hint}
           </AppText>
-          <Button title={Copy.save} loading={busy} onPress={() => onSave(chosen)} style={styles.save} />
+          <Button
+            title={Copy.save}
+            loading={busy}
+            disabled={offline}
+            onPress={() => onSave(chosen)}
+            style={styles.save}
+          />
         </>
       )}
     </Sheet>

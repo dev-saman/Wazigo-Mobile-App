@@ -1,5 +1,6 @@
 import type { ConversationPriority } from '@/api/types';
 import { Sheet, SheetAction, type IconName } from '@/components/common';
+import { StateCopy } from '@/components/feedback';
 
 const OPTIONS: { value: ConversationPriority; label: string; icon: IconName; hint: string }[] = [
   { value: 'urgent', label: 'Urgent', icon: 'alert-circle-outline', hint: 'Needs attention now' },
@@ -14,12 +15,25 @@ export type PrioritySheetProps = {
   onClose: () => void;
   onSelect: (priority: ConversationPriority) => void;
   busy?: boolean;
+  offline?: boolean;
 };
 
 /** CHAT-15 takes exactly one of these four values. */
-export function PrioritySheet({ visible, value, onClose, onSelect, busy = false }: PrioritySheetProps) {
+export function PrioritySheet({
+  visible,
+  value,
+  onClose,
+  onSelect,
+  busy = false,
+  offline = false,
+}: PrioritySheetProps) {
   return (
-    <Sheet visible={visible} title="Priority" onClose={onClose}>
+    <Sheet
+      visible={visible}
+      title="Priority"
+      onClose={onClose}
+      notice={offline ? StateCopy.offlineAction : undefined}
+    >
       {OPTIONS.map((option) => (
         <SheetAction
           key={option.value}
@@ -27,7 +41,7 @@ export function PrioritySheet({ visible, value, onClose, onSelect, busy = false 
           label={option.label}
           description={option.hint}
           selected={option.value === value}
-          disabled={busy}
+          disabled={busy || offline}
           onPress={() => onSelect(option.value)}
         />
       ))}

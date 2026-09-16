@@ -5,7 +5,13 @@ import { router } from 'expo-router';
 import { Permissions, type Conversation } from '@/api/types';
 import { AppText, Screen } from '@/components/common';
 import { ChatFilterChips, ChatSearchField, ConversationRow } from '@/components/chat';
-import { ListFooterLoader, SkeletonList, StateView } from '@/components/feedback';
+import {
+  ErrorState,
+  ListFooterLoader,
+  SkeletonList,
+  StaleDataBanner,
+  StateView,
+} from '@/components/feedback';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { RequirePermission } from '@/features/bootstrap';
 import {
@@ -34,10 +40,9 @@ const Copy = {
   noMatchTitle: 'No matching conversations',
   noMatchDescription: 'Try a different search term or filter.',
   clear: 'Clear search and filters',
-  offlineTitle: 'You are offline',
-  offlineDescription: 'Please check your internet connection and try again.',
   failedTitle: 'We could not load your conversations',
-  retry: 'Retry',
+  retryLabel: 'Retry loading your conversations',
+  stale: 'Showing the chats we already loaded',
 };
 
 function ChatsScreen() {
@@ -100,7 +105,6 @@ function ChatsScreen() {
 
   const busy = status === 'loading';
   const failed = status === 'failed';
-  const offline = !!error?.isOffline;
 
   return (
     <Screen edges={['top']} padded={false}>
@@ -113,18 +117,24 @@ function ChatsScreen() {
       <ChatSearchField value={term} onChangeText={setTerm} />
       <ChatFilterChips value={filter} onChange={onFilter} />
 
+      {/* A refresh or a next page that failed with rows already listed: the
+          rows stay, and this says they may be out of date. */}
+      {failed ? null : (
+        <View style={styles.stale}>
+          <StaleDataBanner error={error} title={Copy.stale} />
+        </View>
+      )}
+
       {busy ? (
         <View style={styles.skeleton}>
-          <SkeletonList rows={7} />
+          <SkeletonList rows={7} label="Loading your conversations" />
         </View>
       ) : failed ? (
-        <StateView
-          icon={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-          tone={offline ? 'neutral' : 'error'}
-          title={offline ? Copy.offlineTitle : Copy.failedTitle}
-          description={offline ? Copy.offlineDescription : error?.message}
-          actionLabel={Copy.retry}
-          onAction={() => void dispatch(loadConversations())}
+        <ErrorState
+          error={error}
+          title={Copy.failedTitle}
+          onRetry={() => void dispatch(loadConversations())}
+          retryAccessibilityLabel={Copy.retryLabel}
         />
       ) : (
         <FlatList
@@ -137,7 +147,9 @@ function ChatsScreen() {
           keyboardShouldPersistTaps="handled"
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={<ListFooterLoader visible={status === 'loadingMore'} />}
+          ListFooterComponent={
+            <ListFooterLoader visible={status === 'loadingMore'} label="Loading more conversations" />
+          }
           refreshControl={
             <RefreshControl
               refreshing={status === 'refreshing'}
@@ -178,6 +190,7 @@ export default function ChatsTab() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: Layout.screenPadding, paddingTop: Spacing.sm },
   skeleton: { paddingHorizontal: Layout.screenPadding, paddingTop: Spacing.sm },
+  stale: { paddingHorizontal: Layout.screenPadding },
   listContent: { paddingBottom: Spacing.xxl },
   emptyContent: { flexGrow: 1 },
   separator: {

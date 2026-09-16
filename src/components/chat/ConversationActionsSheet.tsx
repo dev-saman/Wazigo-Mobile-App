@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { Conversation, ConversationPriority, Label } from '@/api/types';
 import { AppText, Badge, Sheet, SheetAction } from '@/components/common';
+import { StateCopy } from '@/components/feedback';
 import { Spacing } from '@/constants/theme';
 
 const PRIORITY_LABELS: Record<ConversationPriority, string> = {
@@ -36,6 +37,8 @@ export type ConversationActionsSheetProps = {
   /** `conversations.tag`; priority and labels are hidden without it. */
   canTag: boolean;
   busy?: boolean;
+  /** Every action here is a request, so offline they are refused, not queued. */
+  offline?: boolean;
 };
 
 /**
@@ -53,6 +56,7 @@ export function ConversationActionsSheet({
   onTakeOver,
   canTag,
   busy = false,
+  offline = false,
 }: ConversationActionsSheetProps) {
   const resolved = conversation?.status === 'resolved';
   const labels = conversation?.labels ?? [];
@@ -61,7 +65,12 @@ export function ConversationActionsSheet({
   const botActive = !!conversation?.chatbot?.session_id;
 
   return (
-    <Sheet visible={visible} title={Copy.title} onClose={onClose}>
+    <Sheet
+      visible={visible}
+      title={Copy.title}
+      onClose={onClose}
+      notice={offline ? StateCopy.offlineAction : undefined}
+    >
       {labels.length > 0 ? (
         <View style={styles.labels}>
           {labels.map((label: Label) => (
@@ -77,6 +86,7 @@ export function ConversationActionsSheet({
           description={Copy.reopenHint}
           onPress={onReopen}
           busy={busy}
+          disabled={offline}
         />
       ) : (
         <SheetAction
@@ -85,6 +95,7 @@ export function ConversationActionsSheet({
           description={Copy.resolveHint}
           onPress={onResolve}
           busy={busy}
+          disabled={offline}
         />
       )}
 
@@ -95,6 +106,7 @@ export function ConversationActionsSheet({
           description={Copy.takeOverHint}
           onPress={onTakeOver}
           busy={busy}
+          disabled={offline}
         />
       ) : null}
 

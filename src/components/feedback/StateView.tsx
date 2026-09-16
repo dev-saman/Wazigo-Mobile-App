@@ -23,6 +23,8 @@ export type StateViewProps = {
   tone?: Tone;
   actionLabel?: string;
   onAction?: () => void;
+  /** Explicit screen-reader label for the action, e.g. "Retry loading your chats". */
+  actionAccessibilityLabel?: string;
   actionLoading?: boolean;
   actionVariant?: 'primary' | 'dark' | 'secondary';
   footer?: ReactNode;
@@ -40,6 +42,7 @@ export function StateView({
   tone = 'brand',
   actionLabel,
   onAction,
+  actionAccessibilityLabel,
   actionLoading,
   actionVariant = 'primary',
   footer,
@@ -69,6 +72,7 @@ export function StateView({
         <Button
           title={actionLabel}
           onPress={onAction}
+          accessibilityLabel={actionAccessibilityLabel}
           loading={actionLoading}
           variant={actionVariant}
           fullWidth={false}

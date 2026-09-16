@@ -26,7 +26,13 @@ export type BannerProps = {
 export function Banner({ title, description, tone = 'info', icon, action }: BannerProps) {
   const t = tones[tone];
   return (
-    <View style={[styles.base, { backgroundColor: Colors[t.bg] }]} accessible accessibilityRole="summary">
+    <View
+      style={[styles.base, { backgroundColor: Colors[t.bg] }]}
+      accessible
+      accessibilityRole="summary"
+      // A banner appears in reaction to something; screen readers should say so.
+      accessibilityLiveRegion="polite"
+    >
       <Ionicons name={icon ?? t.icon} size={22} color={Colors[t.fg]} />
       <View style={styles.text}>
         <AppText variant="label" color={t.fg}>

@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 
 import { Button, Screen } from '@/components/common';
-import { StateView } from '@/components/feedback';
+import { ErrorState } from '@/components/feedback';
 import { selectAuthStatus } from '@/features/auth/authSelectors';
 import { signOut } from '@/features/auth/authThunks';
 import { SplashView } from '@/features/auth/components/SplashView';
@@ -12,10 +12,8 @@ import { loadBootstrap } from '../bootstrapThunks';
 import { AccessDeniedView } from './AccessDeniedView';
 
 const Copy = {
-  offlineTitle: 'You are offline',
-  offlineDescription: 'Please check your internet connection and try again.',
   failedTitle: 'We could not load your account',
-  retry: 'Retry',
+  retryLabel: 'Retry loading your account',
   signOut: 'Sign out',
 };
 
@@ -53,16 +51,13 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
   }
 
   if (status === 'failed' && error?.code !== 'UNAUTHORIZED') {
-    const offline = !!error?.isOffline;
     return (
       <Screen>
-        <StateView
-          icon={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-          tone={offline ? 'neutral' : 'error'}
-          title={offline ? Copy.offlineTitle : Copy.failedTitle}
-          description={offline ? Copy.offlineDescription : error?.message}
-          actionLabel={Copy.retry}
-          onAction={() => void dispatch(loadBootstrap())}
+        <ErrorState
+          error={error}
+          title={Copy.failedTitle}
+          onRetry={() => void dispatch(loadBootstrap())}
+          retryAccessibilityLabel={Copy.retryLabel}
           footer={
             <Button
               title={Copy.signOut}

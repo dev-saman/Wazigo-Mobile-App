@@ -32,26 +32,34 @@ export function Skeleton({ width = '100%', height = 14, radius = Radius.sm, styl
   );
 }
 
-/** One chat-list row placeholder (avatar + two lines + time). */
-export function ChatRowSkeleton() {
+/** One list-row placeholder. `avatar` matches the chat list; without it, a plain row. */
+export function ChatRowSkeleton({ avatar = true }: { avatar?: boolean }) {
   return (
     <View style={styles.row}>
-      <Skeleton width={44} height={44} radius={22} />
+      {avatar ? <Skeleton width={44} height={44} radius={22} /> : null}
       <View style={styles.lines}>
         <Skeleton width="55%" height={14} />
         <Skeleton width="80%" height={12} />
       </View>
-      <Skeleton width={32} height={10} />
+      {avatar ? <Skeleton width={32} height={10} /> : null}
     </View>
   );
 }
 
+export type SkeletonListProps = {
+  rows?: number;
+  /** False for rows without an avatar, e.g. the template list. */
+  avatar?: boolean;
+  /** What is loading, announced once instead of row by row. */
+  label?: string;
+};
+
 /** Screen-level wrapper announced once to screen readers. */
-export function SkeletonList({ rows = 8 }: { rows?: number }) {
+export function SkeletonList({ rows = 8, avatar = true, label = 'Loading' }: SkeletonListProps) {
   return (
-    <View accessible accessibilityLabel="Loading" accessibilityRole="progressbar">
+    <View accessible accessibilityLabel={label} accessibilityRole="progressbar">
       {Array.from({ length: rows }, (_, i) => (
-        <ChatRowSkeleton key={i} />
+        <ChatRowSkeleton key={i} avatar={avatar} />
       ))}
     </View>
   );

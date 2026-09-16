@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { Message } from '@/api/types';
 import { AppText, Sheet, SheetAction } from '@/components/common';
+import { StateCopy } from '@/components/feedback';
 import { Colors, Spacing } from '@/constants/theme';
 import { messageTimestamp, retryAbilityFor } from '@/features/messages';
 import { formatIstDate, formatIstTime } from '@/utils/datetime';
@@ -30,6 +31,8 @@ export type MessageActionsSheetProps = {
   onClose: () => void;
   onRetry: (message: Message) => void;
   retrying?: boolean;
+  /** Retry is a request like any other: offline it is refused, not queued. */
+  offline?: boolean;
 };
 
 /**
@@ -43,6 +46,7 @@ export function MessageActionsSheet({
   onClose,
   onRetry,
   retrying = false,
+  offline = false,
 }: MessageActionsSheetProps) {
   if (!message) return null;
 
@@ -50,8 +54,15 @@ export function MessageActionsSheet({
   const status = (message.status && STATUS_LABELS[message.status]) || 'Unknown';
   const retry = retryAbilityFor(message);
 
+  const canRetry = message.status === 'failed' && retry.available;
+
   return (
-    <Sheet visible={visible} title={Copy.title} onClose={onClose}>
+    <Sheet
+      visible={visible}
+      title={Copy.title}
+      onClose={onClose}
+      notice={offline && canRetry ? StateCopy.offlineAction : undefined}
+    >
       <View style={styles.rows}>
         <View style={styles.row}>
           <AppText variant="bodySmall" color="textSecondary">
@@ -92,6 +103,7 @@ export function MessageActionsSheet({
             label={Copy.retry}
             description={retry.mayDuplicate ? Copy.duplicate : Copy.fresh}
             busy={retrying}
+            disabled={offline}
             onPress={() => onRetry(message)}
           />
         ) : (

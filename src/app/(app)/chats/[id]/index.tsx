@@ -15,11 +15,12 @@ import {
   PrioritySheet,
   ReplyWindowBanner,
   ThreadHeader,
+  ThreadSkeleton,
   type AttachmentChoice,
 } from '@/components/chat';
 import { Screen } from '@/components/common';
-import { ListFooterLoader, StateView } from '@/components/feedback';
-import { Colors, Spacing } from '@/constants/theme';
+import { ErrorState, ListFooterLoader, StaleDataBanner, StateView } from '@/components/feedback';
+import { Colors, Layout, Spacing } from '@/constants/theme';
 import { AccessDeniedView, RequirePermission, usePermission } from '@/features/bootstrap';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import {
@@ -56,15 +57,14 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 const Copy = {
   emptyTitle: 'No messages yet',
   emptyDescription: 'Messages in this conversation will appear here.',
-  offlineTitle: 'You are offline',
-  offlineDescription: 'Please check your internet connection and try again.',
   failedTitle: 'We could not load this conversation',
+  retryLabel: 'Retry loading this conversation',
+  stale: 'Some messages could not be loaded',
   missingTitle: 'Conversation unavailable',
   missingDescription: 'This conversation is no longer available.',
-  retry: 'Retry',
   back: 'Back to chats',
   attachmentFailed: 'Attachment',
-  offlineComposer: 'You are offline',
+  offlineComposer: 'Reconnect to send a message',
   actionFailed: 'That did not work',
 };
 
@@ -218,21 +218,28 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
       return <AccessDeniedView description={error.message} actionLabel={Copy.back} onAction={goBack} />;
     }
 
-    const offline = !!error?.isOffline;
+    // A conversation that is gone cannot be retried; every other failure can.
     const missing = error?.code === 'NOT_FOUND';
     return (
       <Screen background="chatBackground" edges={['top', 'bottom']} padded={false}>
         {header}
-        <StateView
-          icon={offline ? 'cloud-offline-outline' : missing ? 'help-circle-outline' : 'alert-circle-outline'}
-          tone={offline || missing ? 'neutral' : 'error'}
-          title={offline ? Copy.offlineTitle : missing ? Copy.missingTitle : Copy.failedTitle}
-          description={
-            offline ? Copy.offlineDescription : missing ? Copy.missingDescription : error?.message
-          }
-          actionLabel={missing ? Copy.back : Copy.retry}
-          onAction={missing ? goBack : () => void dispatch(loadThread({ conversationId }))}
-        />
+        {missing ? (
+          <StateView
+            icon="help-circle-outline"
+            tone="neutral"
+            title={Copy.missingTitle}
+            description={Copy.missingDescription}
+            actionLabel={Copy.back}
+            onAction={goBack}
+          />
+        ) : (
+          <ErrorState
+            error={error}
+            title={Copy.failedTitle}
+            onRetry={() => void dispatch(loadThread({ conversationId }))}
+            retryAccessibilityLabel={Copy.retryLabel}
+          />
+        )}
       </Screen>
     );
   }
@@ -247,10 +254,13 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
       >
       {header}
 
+      {/* Messages already on screen stay; only the page that failed is missing. */}
+      <View style={styles.stale}>
+        <StaleDataBanner error={error} title={Copy.stale} />
+      </View>
+
       {loading ? (
-        <View style={styles.centre}>
-          <ListFooterLoader visible />
-        </View>
+        <ThreadSkeleton />
       ) : rows.length === 0 ? (
         <StateView
           icon="chatbubble-ellipses-outline"
@@ -267,7 +277,9 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
           contentContainerStyle={styles.list}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={<ListFooterLoader visible={status === 'loadingOlder'} />}
+          ListFooterComponent={
+            <ListFooterLoader visible={status === 'loadingOlder'} label="Loading older messages" />
+          }
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
         />
@@ -315,6 +327,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         message={actionMessage}
         onClose={() => setActionMessage(null)}
         onRetry={onRetry}
+        offline={offline}
       />
 
       <ConversationActionsSheet
@@ -322,6 +335,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         conversation={thread}
         canTag={canTag}
         busy={actionBusy}
+        offline={offline}
         onClose={() => setOpenSheet('none')}
         onResolve={() => void runAction(() => dispatch(resolveConversation({ conversationId })).unwrap())}
         onReopen={() => void runAction(() => dispatch(reopenConversation({ conversationId })).unwrap())}
@@ -337,6 +351,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         visible={openSheet === 'priority'}
         value={thread?.priority ?? 'normal'}
         busy={actionBusy}
+        offline={offline}
         onClose={() => setOpenSheet('conversation')}
         onSelect={(priority: ConversationPriority) =>
           void runAction(() => dispatch(setConversationPriority({ conversationId, priority })).unwrap())
@@ -350,6 +365,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         status={labelsStatus}
         selected={(thread?.labels ?? []).map((label) => label.id)}
         busy={actionBusy}
+        offline={offline}
         onClose={() => setOpenSheet('conversation')}
         onSave={(labelIds) =>
           void runAction(() => dispatch(setConversationLabels({ conversationId, labelIds })).unwrap())
@@ -389,5 +405,5 @@ export default function ConversationRoute() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   list: { paddingVertical: Spacing.md, backgroundColor: Colors.chatBackground },
-  centre: { flex: 1, justifyContent: 'center' },
+  stale: { paddingHorizontal: Layout.screenPadding },
 });

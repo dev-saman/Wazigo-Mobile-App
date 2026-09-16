@@ -189,6 +189,21 @@ describe('network.ts', () => {
     expect(tokenStorage.get()).toMatchObject({ refreshToken: 'refresh-1' });
   });
 
+  it('keeps the session when the connection drops during a refresh', async () => {
+    const { tokenStorage, api, sessionEvents } = load();
+    await tokenStorage.save('old-access', 'refresh-1', 3600);
+    const expired = jest.fn();
+    sessionEvents.on('expired', expired);
+
+    // No response at all - the same shape as a dropped mobile connection.
+    handler = (req, _body, res) =>
+      req.url === '/api/v1/auth/refresh' ? res.destroy() : json(res, 401, {});
+
+    await expect(api.getBootstrap()).rejects.toMatchObject({ isNetworkError: true });
+    expect(expired).not.toHaveBeenCalled();
+    expect(tokenStorage.get()).toMatchObject({ refreshToken: 'refresh-1' });
+  });
+
   it('normalizes 422 validation and 429 rate-limit errors', async () => {
     const { api } = load();
     handler = (req, _body, res) => {

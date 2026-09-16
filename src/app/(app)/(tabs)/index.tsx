@@ -4,7 +4,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Permissions } from '@/api/types';
 import { AppText, Badge, Card, Screen } from '@/components/common';
 import { DashboardSkeleton, MetricCard, StatRow } from '@/components/dashboard';
-import { Banner, StateView } from '@/components/feedback';
+import { ErrorState, StaleDataBanner } from '@/components/feedback';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { selectCurrentUser } from '@/features/auth/authSelectors';
 import { RequirePermission } from '@/features/bootstrap';
@@ -38,10 +38,8 @@ const Copy = {
   read: 'Read',
   failed: 'Failed',
   inFlight: 'In flight',
-  offlineTitle: 'You are offline',
-  offlineDescription: 'Please check your internet connection and try again.',
   failedTitle: 'We could not load your dashboard',
-  retry: 'Retry',
+  retryLabel: 'Retry loading your dashboard',
   refreshFailed: 'Showing the last figures we loaded',
 };
 
@@ -78,17 +76,14 @@ function DashboardScreen() {
   }, [dispatch]);
 
   if (status === 'failed') {
-    const offline = !!error?.isOffline;
     return (
       <Screen edges={['top']}>
         <DashboardHeader />
-        <StateView
-          icon={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-          tone={offline ? 'neutral' : 'error'}
-          title={offline ? Copy.offlineTitle : Copy.failedTitle}
-          description={offline ? Copy.offlineDescription : error?.message}
-          actionLabel={Copy.retry}
-          onAction={() => void dispatch(loadDashboard())}
+        <ErrorState
+          error={error}
+          title={Copy.failedTitle}
+          onRetry={() => void dispatch(loadDashboard())}
+          retryAccessibilityLabel={Copy.retryLabel}
         />
       </Screen>
     );
@@ -120,14 +115,7 @@ function DashboardScreen() {
         ) : (
           <>
             {/* A failed pull-to-refresh keeps the numbers and says they are stale. */}
-            {error ? (
-              <Banner
-                tone="warning"
-                icon={error.isOffline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-                title={Copy.refreshFailed}
-                description={error.message}
-              />
-            ) : null}
+            <StaleDataBanner error={error} title={Copy.refreshFailed} />
 
             <GreetingCard name={user?.name} />
 
