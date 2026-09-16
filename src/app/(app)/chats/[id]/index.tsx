@@ -8,6 +8,7 @@ import {
   DaySeparator,
   MessageBubble,
   MessageComposer,
+  ReplyWindowBanner,
   ThreadHeader,
   type AttachmentChoice,
 } from '@/components/chat';
@@ -16,7 +17,11 @@ import { ListFooterLoader, StateView } from '@/components/feedback';
 import { Colors, Spacing } from '@/constants/theme';
 import { AccessDeniedView, RequirePermission, usePermission } from '@/features/bootstrap';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
-import { markConversationRead, selectConversationById } from '@/features/conversations';
+import {
+  markConversationRead,
+  selectConversationById,
+  useReplyWindow,
+} from '@/features/conversations';
 import {
   buildThreadRows,
   loadOlderMessages,
@@ -57,10 +62,16 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const hasOlder = useAppSelector(selectHasOlderMessages(conversationId));
   // The listed row fills the header while the first page is still loading.
   const listed = useAppSelector(selectConversationById(conversationId));
+  // The window belongs to the conversation, so the fresher of the two wins.
+  const replyWindow = useReplyWindow(conversation ?? listed);
 
   const uploads = useAppSelector(selectThread(conversationId)).uploads;
   const offline = useAppSelector(selectIsOffline);
   const canSend = usePermission(Permissions.conversationsSend);
+  // Both are needed: the picker lists templates, the action sends one.
+  const canViewTemplates = usePermission(Permissions.templatesView);
+  const canSendTemplates = usePermission(Permissions.templatesSend);
+  const canUseTemplates = canViewTemplates && canSendTemplates;
 
   const [draft, setDraft] = useState('');
   const [attaching, setAttaching] = useState(false);
@@ -208,18 +219,35 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         />
       )}
 
-      {/* No permission, no composer: a send box that always fails is worse
-          than none. The reply window and templates arrive in Stage 10. */}
+      {/* WhatsApp refuses free-form messages once the 24-hour window closes, so
+          the composer is replaced by the template action rather than left to
+          fail. No `conversations.send` permission means no composer at all. */}
       {canSend ? (
-        <MessageComposer
-          value={draft}
-          onChangeText={setDraft}
-          onSend={onSend}
-          onAttach={() => setSheetOpen(true)}
-          disabled={offline}
-          sending={attaching}
-          placeholder={offline ? Copy.offlineComposer : undefined}
-        />
+        <>
+          <ReplyWindowBanner
+            window={replyWindow}
+            onChooseTemplate={
+              canUseTemplates
+                ? () =>
+                    router.push({
+                      pathname: '/chats/[id]/templates',
+                      params: { id: conversationId },
+                    })
+                : undefined
+            }
+          />
+          {replyWindow.state === 'closed' ? null : (
+            <MessageComposer
+              value={draft}
+              onChangeText={setDraft}
+              onSend={onSend}
+              onAttach={() => setSheetOpen(true)}
+              disabled={offline}
+              sending={attaching}
+              placeholder={offline ? Copy.offlineComposer : undefined}
+            />
+          )}
+        </>
       ) : null}
 
       <AttachmentSheet

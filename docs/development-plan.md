@@ -323,6 +323,29 @@ src/app/
   is worse than none. Decide before release.
 - app.json now carries the iOS camera and photo-library permission strings.
 
+## Reply window and templates (Stage 10)
+
+- `src/features/conversations/replyWindow.ts` + `useReplyWindow()`; `src/features/templates/`
+  (slice, CHAT-07 thunks, `templateParams.ts`); `sendTemplate` (CHAT-08) in `sendThunks.ts`;
+  `ReplyWindowBanner`, `TemplateListItem`, and the route `(app)/chats/[id]/templates`.
+  The thread route moved to `(app)/chats/[id]/index.tsx` - same URL, room for the child route.
+- **The server owns the window.** `window_open` and `window_expires_at` come from the Conversation
+  resource; the app only formats the remainder. Two safeguards: the expiry timestamp wins over a
+  stale `window_open` flag, and the value is recomputed from that timestamp every 30 s **and on
+  app foreground** rather than ticking locally, which would drift while backgrounded.
+- **Closed window replaces the composer with "Choose Template"**, it does not disable it: WhatsApp
+  refuses free-form messages outside 24 hours, so offering a send box that must fail is dishonest.
+  Without `templates.view` + `templates.send`, the banner explains rather than offering the action.
+- Templates come from CHAT-07 with `approved_only=1` (an unapproved template cannot be sent, so it
+  is never listed), searched server-side with the same debounce-and-cancel as the chats list.
+- Parameters: `variable_counts` is trusted first and the placeholders in the text are counted only
+  when it is missing, so a form is still usable if the field is absent. Labels come from
+  `variable_tokens` when they are names. **20 parameters and 1024 characters each are enforced
+  before sending**, and a live preview shows the filled text so nobody sends `{{1}}` to a customer.
+- Sending a template is optimistic like any other message: the pending bubble carries the rendered
+  text, and the screen returns to the thread immediately rather than waiting.
+- **Not built:** creating or editing templates (dashboard only, no endpoint in scope).
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -334,7 +357,7 @@ src/app/
 7. Chats list, search, filters, pagination ✔
 8. Message history, older-page loading, mark read ✔
 9. Send text + media ✔
-10. Reply window + templates
+10. Reply window + templates ✔
 11. Message states, retry, resolve/reopen, conversation actions
 12. Offline, loading, session expired, access denied
 13. Realtime (Reverb) architecture with REST fallback

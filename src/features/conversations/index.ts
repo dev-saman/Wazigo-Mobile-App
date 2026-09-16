@@ -21,4 +21,7 @@ export {
   loadMoreConversations,
   markConversationRead,
 } from './conversationsThunks';
+export { formatWindowRemaining, replyWindowFor } from './replyWindow';
+export { useReplyWindow } from './useReplyWindow';
 export type { ChatFilter, ConversationsState, ConversationsStatus } from './conversationsSlice';
+export type { ReplyWindow } from './replyWindow';

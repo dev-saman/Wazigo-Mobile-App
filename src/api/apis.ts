@@ -126,9 +126,13 @@ export const markConversationRead = (conversationId: Id) =>
   network.post<Conversation>(API.conversations.read(conversationId));
 
 /** CHAT-07 */
-export const getTemplates = (params: TemplateListParams = {}) =>
+export const getTemplates = (
+  params: TemplateListParams = {},
+  options?: Pick<RequestOptions, 'signal'>,
+) =>
   network.get<MessageTemplate[], PaginationMeta>(API.templates.list, {
     params: { approved_only: 1, ...params },
+    ...options,
   });
 
 /** CHAT-08 */

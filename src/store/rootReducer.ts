@@ -6,11 +6,11 @@ import { connectivityReducer } from '@/features/connectivity/connectivitySlice';
 import { conversationsReducer } from '@/features/conversations/conversationsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
 import { messagesReducer } from '@/features/messages/messagesSlice';
+import { templatesReducer } from '@/features/templates/templatesSlice';
 
 import { appReset } from './actions';
 
-// Feature slices (templates, presence) are registered here as their stages are
-// implemented.
+// Feature slices (presence) are registered here as their stages are implemented.
 const combined = combineReducers({
   auth: authReducer,
   bootstrap: bootstrapReducer,
@@ -18,6 +18,7 @@ const combined = combineReducers({
   conversations: conversationsReducer,
   dashboard: dashboardReducer,
   messages: messagesReducer,
+  templates: templatesReducer,
 });
 
 export type RootState = ReturnType<typeof combined>;

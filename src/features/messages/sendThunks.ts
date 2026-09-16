@@ -1,6 +1,12 @@
 import * as api from '@/api/apis';
 import { normalizeError } from '@/api/network';
-import { MessageLimits, type MediaMessageType, type Message, type UploadFile } from '@/api/types';
+import {
+  MessageLimits,
+  type MediaMessageType,
+  type Message,
+  type SendTemplatePayload,
+  type UploadFile,
+} from '@/api/types';
 import { createAppAsyncThunk } from '@/store/hooks';
 
 import { messageFailed, messageQueued, messageSent, uploadProgress } from './messagesSlice';
@@ -92,6 +98,29 @@ export const sendMedia = createAppAsyncThunk<
           dispatch(uploadProgress({ conversationId, localId: local.id, fraction })),
       },
     );
+    dispatch(messageSent({ conversationId, localId: local.id, message: data }));
+  } catch (error) {
+    const apiError = normalizeError(error);
+    dispatch(messageFailed({ conversationId, localId: local.id, detail: apiError.message }));
+    if (apiError.code === 'CONFLICT') void dispatch(loadThread({ conversationId }));
+    return rejectWithValue(apiError);
+  }
+});
+
+/**
+ * CHAT-08. The only thing that can be sent once the 24-hour window has closed.
+ * `preview` is the filled-in body, so the pending bubble shows what the
+ * customer will actually receive instead of `{{1}}`.
+ */
+export const sendTemplate = createAppAsyncThunk<
+  void,
+  { conversationId: string; payload: SendTemplatePayload; preview: string }
+>('messages/sendTemplate', async ({ conversationId, payload, preview }, { dispatch, rejectWithValue }) => {
+  const local = draft(conversationId, { type: 'template', text_body: preview });
+  dispatch(messageQueued({ conversationId, message: local }));
+
+  try {
+    const { data } = await api.sendTemplate(conversationId, payload);
     dispatch(messageSent({ conversationId, localId: local.id, message: data }));
   } catch (error) {
     const apiError = normalizeError(error);
