@@ -34,7 +34,7 @@ management, settings).
 | 8. Message history, older pages, mark read | done — `5f8aefa` |
 | 9. Send text + media | done — `6c8c993` |
 | 10. Reply window + templates | done — `95f720b` |
-| 11. Message states, retry, resolve/reopen, actions | done |
+| 11. Message states, retry, resolve/reopen, actions | done — `2d94323` |
 | 12. Offline, loading, session expired, access denied | **next** |
 | 13–15 | not started (see plan) |
 
