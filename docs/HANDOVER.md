@@ -27,7 +27,7 @@ management, settings).
 | 1. Environment, Expo, Git, dependencies, folders | done — `37856cf` |
 | 2. Branding, Poppins, design system | done — `2851455` |
 | 3. Network layer, APIs, Redux, token storage | done — `88ea399` |
-| 4. Splash + Login (OTP/password) + OTP verification | done |
+| 4. Splash + Login (OTP/password) + OTP verification | done — `83e6b2f` |
 | 5. `/me/bootstrap`, permissions, session restore | **next** |
 | 6–15 | not started (see plan) |
 
