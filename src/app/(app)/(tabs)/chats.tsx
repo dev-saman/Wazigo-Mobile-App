@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 
 import { Permissions, type Conversation } from '@/api/types';
 import { AppText, Screen } from '@/components/common';
@@ -86,9 +87,15 @@ function ChatsScreen() {
     dispatch(filterChanged('mine'));
   }, [dispatch]);
 
+  const openConversation = useCallback((conversation: Conversation) => {
+    router.push({ pathname: '/chats/[id]', params: { id: String(conversation.id) } });
+  }, []);
+
   const renderItem = useCallback(
-    ({ item }: { item: Conversation }) => <ConversationRow conversation={item} />,
-    [],
+    ({ item }: { item: Conversation }) => (
+      <ConversationRow conversation={item} onPress={openConversation} />
+    ),
+    [openConversation],
   );
 
   const busy = status === 'loading';

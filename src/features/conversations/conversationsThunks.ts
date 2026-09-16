@@ -1,9 +1,11 @@
 import * as api from '@/api/apis';
 import { normalizeError } from '@/api/network';
 import type { ConversationListParams } from '@/api/types';
+import { threadConversationUpdated } from '@/features/messages/messagesSlice';
 import { createAppAsyncThunk } from '@/store/hooks';
 
 import {
+  conversationPatched,
   conversationsFailed,
   conversationsLoaded,
   conversationsLoading,
@@ -101,6 +103,26 @@ export const loadMoreConversations = createAppAsyncThunk<void, void>(
       const apiError = normalizeError(error);
       if (apiError.code !== 'CANCELLED') dispatch(conversationsFailed(apiError));
       return rejectWithValue(apiError);
+    }
+  },
+);
+
+/**
+ * CHAT-06. Returns the updated Conversation, so the list row and the open
+ * thread are patched from the response instead of being refetched.
+ */
+export const markConversationRead = createAppAsyncThunk<void, { conversationId: string }>(
+  'conversations/markRead',
+  async ({ conversationId }, { dispatch, rejectWithValue }) => {
+    try {
+      const { data } = await api.markConversationRead(conversationId);
+      if (data) {
+        dispatch(conversationPatched(data));
+        dispatch(threadConversationUpdated({ conversationId, conversation: data }));
+      }
+    } catch (error) {
+      // Silent: failing to clear a badge must never interrupt reading a chat.
+      return rejectWithValue(normalizeError(error));
     }
   },
 );

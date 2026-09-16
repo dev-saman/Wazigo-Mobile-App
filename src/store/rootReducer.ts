@@ -5,17 +5,19 @@ import { bootstrapReducer } from '@/features/bootstrap/bootstrapSlice';
 import { connectivityReducer } from '@/features/connectivity/connectivitySlice';
 import { conversationsReducer } from '@/features/conversations/conversationsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
+import { messagesReducer } from '@/features/messages/messagesSlice';
 
 import { appReset } from './actions';
 
-// Feature slices (messages, templates, presence) are registered here as their
-// stages are implemented.
+// Feature slices (templates, presence) are registered here as their stages are
+// implemented.
 const combined = combineReducers({
   auth: authReducer,
   bootstrap: bootstrapReducer,
   connectivity: connectivityReducer,
   conversations: conversationsReducer,
   dashboard: dashboardReducer,
+  messages: messagesReducer,
 });
 
 export type RootState = ReturnType<typeof combined>;

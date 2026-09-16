@@ -268,6 +268,31 @@ src/app/
 - Rows are not pressable yet - the thread screen arrives in Stage 8, and a button that goes nowhere
   is worse than plain text for a screen reader.
 
+## Message thread (Stage 8)
+
+- Route `src/app/(app)/chats/[id].tsx` - a sibling of `(tabs)`, so the thread covers the tab bar.
+  `/chats` is the list, `/chats/123` the thread. Rows in the list are pressable from this stage on.
+- `src/features/messages/` — state keyed by conversation id (`byConversation[id]`), so moving
+  between chats does not throw away the previous thread. `loadThread` / `loadOlderMessages`
+  (CHAT-02, `per_page=30`), plus `threadRows.ts`, which turns messages into rows with day
+  separators and is unit-tested apart from the screen.
+- **The header comes from `meta.conversation`**, not from the tapped row, which may be minutes old;
+  the row is used only as the placeholder until the first page lands.
+- CHAT-02 is newest-first, which is what an **inverted `FlatList`** wants (index 0 at the bottom).
+  `onEndReached` therefore means *older*, and fires only while `current_page < last_page`. Pages
+  merge by id, and a failed older page keeps the messages already on screen.
+- Day separators use `isSameIstDay`, so a 23:30 and a 00:30 message are on different days for an
+  Indian business even when the device is set elsewhere. Bubble times use `formatIstTime`.
+- **Mark read (CHAT-06) runs once per visit**, only when the thread actually has unread messages,
+  and its response patches both the open thread and the listed row - no refetch. A failure is
+  swallowed: an uncleared badge must never interrupt reading a chat.
+- 403 on a thread shows Access Denied rather than a retry - **blocker 2** makes a refusal a real
+  possibility. 404 offers a way back instead of a retry.
+- Media bubbles show the filename or a type label only; authenticated download (CHAT-05) is Stage 9.
+- No call button and no customer presence in the header (neither exists in the API).
+- **Known limitation:** threads stay in memory for the session. Fine for phase 1; if it ever
+  matters, evict all but the last few on `appReset` or on a memory warning.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -277,7 +302,7 @@ src/app/
 5. `/me/bootstrap`, permissions, session restore ✔
 6. Personal dashboard ✔
 7. Chats list, search, filters, pagination ✔
-8. Message history, older-page loading, mark read
+8. Message history, older-page loading, mark read ✔
 9. Send text + media
 10. Reply window + templates
 11. Message states, retry, resolve/reopen, conversation actions

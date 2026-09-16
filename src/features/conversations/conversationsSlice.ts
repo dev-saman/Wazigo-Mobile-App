@@ -84,6 +84,15 @@ const conversationsSlice = createSlice({
       // A failed refresh or next page keeps whatever is already listed.
       state.status = state.items.length > 0 ? 'ready' : 'failed';
     },
+    /**
+     * Replaces one row with the server's latest copy (CHAT-06 and the Stage 11
+     * actions all return the updated Conversation). Rows the current query does
+     * not contain are ignored rather than inserted out of order.
+     */
+    conversationPatched(state, action: PayloadAction<Conversation>) {
+      const index = state.items.findIndex((item) => item.id === action.payload.id);
+      if (index >= 0) state.items[index] = action.payload;
+    },
     filterChanged(state, action: PayloadAction<ChatFilter>) {
       if (state.filter === action.payload) return;
       state.filter = action.payload;
@@ -115,6 +124,7 @@ export const {
   conversationsLoading,
   conversationsLoaded,
   conversationsFailed,
+  conversationPatched,
   filterChanged,
   searchChanged,
 } = conversationsSlice.actions;

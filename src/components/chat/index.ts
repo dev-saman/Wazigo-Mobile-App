@@ -1,6 +1,11 @@
 export { ChatFilterChips } from './ChatFilterChips';
 export { ChatSearchField } from './ChatSearchField';
 export { ConversationRow } from './ConversationRow';
+export { DaySeparator, dayLabel } from './DaySeparator';
+export { MessageBubble } from './MessageBubble';
 export { MessageTick } from './MessageTick';
+export { ThreadHeader } from './ThreadHeader';
 export type { ChatFilterChipsProps } from './ChatFilterChips';
 export type { ConversationRowProps } from './ConversationRow';
+export type { MessageBubbleProps } from './MessageBubble';
+export type { ThreadHeaderProps } from './ThreadHeader';
