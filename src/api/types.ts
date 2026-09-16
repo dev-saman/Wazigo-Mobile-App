@@ -239,6 +239,18 @@ export type MessageMedia = {
   pending?: boolean;
 };
 
+/**
+ * WhatsApp Cloud API's error object, which the live API passes through as a
+ * failed message's `error_detail` (the workbook documents a string). Read it
+ * with `messageErrorText`, never directly.
+ */
+export type MessageErrorDetail = {
+  code?: number | string | null;
+  title?: string | null;
+  message?: string | null;
+  error_data?: { details?: string | null } | null;
+};
+
 export type Message = {
   id: number;
   conversation_id: number;
@@ -246,7 +258,8 @@ export type Message = {
   origin?: string | null;
   type: MessageType;
   status?: MessageStatus | null;
-  error_detail?: string | null;
+  /** A string, or WhatsApp's error object(s). Render through `messageErrorText`. */
+  error_detail?: string | MessageErrorDetail | MessageErrorDetail[] | null;
   retry?: MessageRetryState | null;
   /** Response field. The send request uses `text`. */
   text_body?: string | null;

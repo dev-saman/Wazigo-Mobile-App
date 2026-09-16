@@ -4,7 +4,7 @@ import type { Message } from '@/api/types';
 import { AppText, Sheet, SheetAction } from '@/components/common';
 import { StateCopy } from '@/components/feedback';
 import { Colors, Spacing } from '@/constants/theme';
-import { messageTimestamp, retryAbilityFor } from '@/features/messages';
+import { messageErrorText, messageTimestamp, retryAbilityFor } from '@/features/messages';
 import { formatIstDate, formatIstTime } from '@/utils/datetime';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -53,6 +53,7 @@ export function MessageActionsSheet({
   const ms = messageTimestamp(message);
   const status = (message.status && STATUS_LABELS[message.status]) || 'Unknown';
   const retry = retryAbilityFor(message);
+  const errorText = messageErrorText(message.error_detail);
 
   const canRetry = message.status === 'failed' && retry.available;
 
@@ -90,9 +91,9 @@ export function MessageActionsSheet({
         ) : null}
       </View>
 
-      {message.error_detail ? (
+      {errorText ? (
         <AppText variant="bodySmall" color="error" style={styles.detail}>
-          {message.error_detail}
+          {errorText}
         </AppText>
       ) : null}
 

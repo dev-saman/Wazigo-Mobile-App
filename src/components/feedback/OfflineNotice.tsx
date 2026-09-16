@@ -1,7 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { AppText } from '@/components/common';
+// Direct, not through the common barrel: the barrel exports Screen, which renders
+// this component, so importing the barrel here made a require cycle.
+import { AppText } from '@/components/common/AppText';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import { useAppSelector } from '@/store/hooks';

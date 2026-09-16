@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { Message } from '@/api/types';
 import { AppText } from '@/components/common';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { messageErrorText } from '@/features/messages/messageError';
 import { messageTimestamp } from '@/features/messages/threadRows';
 import { formatIstTime } from '@/utils/datetime';
 
@@ -33,6 +34,7 @@ function MessageBubbleComponent({
   const ms = messageTimestamp(message);
   const time = ms ? formatIstTime(ms) : '';
   const failed = message.status === 'failed';
+  const errorText = failed ? messageErrorText(message.error_detail) : null;
 
   const bubbleStyle = [
     styles.bubble,
@@ -84,9 +86,9 @@ function MessageBubbleComponent({
           {outbound ? <MessageTick status={message.status} size={13} /> : null}
         </View>
 
-        {failed && message.error_detail ? (
+        {errorText ? (
           <AppText variant="caption" color="error" style={styles.error}>
-            {message.error_detail}
+            {errorText}
           </AppText>
         ) : null}
       </Pressable>

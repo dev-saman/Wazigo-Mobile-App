@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import type { Conversation } from '@/api/types';
 import { AppText, Avatar, Badge, IconButton } from '@/components/common';
 import { Colors, Layout, Spacing } from '@/constants/theme';
-import { formatPhoneForDisplay } from '@/utils/phone';
+import { contactDisplay } from '@/features/conversations/contactDisplay';
 
 export type ThreadHeaderProps = {
   /** CHAT-02's `meta.conversation` when it has arrived, else the listed row. */
@@ -19,22 +19,23 @@ export type ThreadHeaderProps = {
  * such field, and inventing "Online" would be a lie about a real person.
  */
 export function ThreadHeader({ conversation, onBack, onActions }: ThreadHeaderProps) {
-  const contact = conversation?.contact;
-  const name = contact?.name?.trim() || 'Conversation';
-  const phone = contact?.phone ?? contact?.wa_id ?? null;
+  // Name, else the formatted number, else "Unknown Contact" - never a generic
+  // "Conversation". The number is repeated underneath only when a name is shown.
+  const contact = contactDisplay(conversation?.contact);
+  const subtitle = contact.name ? contact.phone : null;
   const resolved = conversation?.status === 'resolved';
 
   return (
     <View style={styles.header}>
       <IconButton icon="chevron-back" accessibilityLabel="Back to chats" onPress={onBack} />
-      <Avatar name={name} size={40} />
+      <Avatar name={contact.name} size={40} />
       <View style={styles.text}>
         <AppText variant="title" numberOfLines={1} accessibilityRole="header">
-          {name}
+          {contact.title}
         </AppText>
-        {phone ? (
+        {subtitle ? (
           <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-            {formatPhoneForDisplay(phone)}
+            {subtitle}
           </AppText>
         ) : null}
       </View>

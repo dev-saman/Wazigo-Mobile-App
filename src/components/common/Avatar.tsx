@@ -1,9 +1,13 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Colors } from '@/constants/theme';
+import { getInitials } from '@/utils/initials';
 
 import { AppText } from './AppText';
+
+export { getInitials };
 
 const PALETTE = [
   { bg: '#D8F8DE', fg: '#00603A' },
@@ -14,13 +18,8 @@ const PALETTE = [
   { bg: '#E2E8F0', fg: '#1E293B' },
 ] as const;
 
-export const getInitials = (name?: string | null) => {
-  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  const first = parts[0][0] ?? '';
-  const last = parts.length > 1 ? parts[parts.length - 1][0] ?? '' : '';
-  return (first + last).toUpperCase();
-};
+/** For a contact without a name: no colour, because there is no identity to hint at. */
+const NEUTRAL = { bg: Colors.grey100, fg: Colors.grey400 };
 
 const pickColors = (seed: string) => {
   let hash = 0;
@@ -29,6 +28,7 @@ const pickColors = (seed: string) => {
 };
 
 export type AvatarProps = {
+  /** A person's name. Pass nothing for a number-only contact: never a phone number. */
   name?: string | null;
   uri?: string | null;
   size?: number;
@@ -37,7 +37,10 @@ export type AvatarProps = {
 };
 
 export function Avatar({ name, uri, size = 44, showOnline = false }: AvatarProps) {
-  const colors = pickColors(name ?? '');
+  const initials = getInitials(name);
+  // Without a name the avatar is neutral: a colour picked from a phone number
+  // would suggest an identity the app does not have.
+  const colors = initials ? pickColors(name ?? '') : NEUTRAL;
   const dot = Math.max(10, Math.round(size * 0.26));
 
   return (
@@ -46,9 +49,13 @@ export function Avatar({ name, uri, size = 44, showOnline = false }: AvatarProps
         <Image source={{ uri }} style={[styles.round, { width: size, height: size, borderRadius: size / 2 }]} contentFit="cover" />
       ) : (
         <View style={[styles.round, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.bg }]}>
-          <AppText variant={size >= 44 ? 'title' : 'captionMedium'} style={{ color: colors.fg }}>
-            {getInitials(name)}
-          </AppText>
+          {initials ? (
+            <AppText variant={size >= 44 ? 'title' : 'captionMedium'} style={{ color: colors.fg }}>
+              {initials}
+            </AppText>
+          ) : (
+            <Ionicons name="person" size={Math.round(size * 0.5)} color={colors.fg} />
+          )}
         </View>
       )}
       {showOnline ? (

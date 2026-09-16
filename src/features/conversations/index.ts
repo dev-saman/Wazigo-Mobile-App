@@ -31,7 +31,9 @@ export {
   stopChatbot,
 } from './conversationActions';
 export { labelsReducer, loadLabels, selectLabels, selectLabelsStatus } from './labelsSlice';
+export { contactDisplay, UNKNOWN_CONTACT } from './contactDisplay';
 export { formatWindowRemaining, replyWindowFor } from './replyWindow';
 export { useReplyWindow } from './useReplyWindow';
 export type { ChatFilter, ConversationsState, ConversationsStatus } from './conversationsSlice';
+export type { ContactDisplay } from './contactDisplay';
 export type { ReplyWindow } from './replyWindow';

@@ -10,6 +10,7 @@ export {
   selectThreadStatus,
   selectUploadProgress,
 } from './messagesSelectors';
+export { messageErrorText } from './messageError';
 export { loadOlderMessages, loadThread } from './messagesThunks';
 export { retryAbilityFor, retryMessage } from './retryThunks';
 export { isLocalMessage, sendMedia, sendTemplate, sendText } from './sendThunks';
