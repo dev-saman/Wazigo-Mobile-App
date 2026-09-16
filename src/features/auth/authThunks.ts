@@ -96,7 +96,9 @@ export const signInWithPassword = createAppAsyncThunk<AuthUser, { phone: string;
 /**
  * Launch gate. Tokens in SecureStore mean the previous session continues; an
  * expired access token is refreshed first so a dead session lands on Login
- * instead of flashing the app. `/me/bootstrap` follows in Stage 5.
+ * instead of flashing the app. Permissions are not loaded here: `BootstrapGate`
+ * holds the signed-in area until AUTH-05 answers, for a restored session and a
+ * fresh login alike.
  */
 export const restoreSession = createAppAsyncThunk<void, void>(
   'auth/restoreSession',

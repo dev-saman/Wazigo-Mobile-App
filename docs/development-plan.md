@@ -183,13 +183,40 @@ src/app/
   generic "The given data was invalid." does not.
 - Both screens disable submit while `connectivity.isConnected === false`.
 
+## Bootstrap & permissions (Stage 5)
+
+- `src/features/bootstrap/` — slice (`status: idle|loading|ready|failed|denied`, `permissions`,
+  `roles`, `numbers`, `error`), `loadBootstrap` thunk (AUTH-05), selectors, `usePermission()`.
+- **`BootstrapGate` wraps `(app)/_layout.tsx`.** No signed-in screen renders until AUTH-05 has
+  answered, so nothing is drawn or sent without the server's own permission list. Its loading
+  state reuses the launch `SplashView`, so cold start and login look like one screen.
+  This replaces the earlier plan of calling bootstrap inside `restoreSession()` / `startSession`:
+  one gate covers both paths, retries in place, and cannot fall out of step with them.
+- Only `user`, `roles`, `permissions` and `numbers` are read. `routes`, `menus`, `feature_flags`,
+  `settings` and `billing` are ignored (web-shell concerns). Roles are accepted as names or as
+  `{ name }` objects; missing lists become empty, never undefined.
+- Failure handling:
+
+  | Failure | Result |
+  | --- | --- |
+  | 401 after the network layer's refresh | sign out (session is gone) |
+  | 403 | `denied` → Access Denied (design 14) with Sign out; never a retry |
+  | offline / timeout / 5xx | `failed` → retry screen, session kept |
+
+- `RequirePermission` + `AccessDeniedView` are ready for the screens that need them
+  (`dashboard.view` in Stage 6, `conversations.view` in Stage 7); `usePermission()` covers
+  hiding an action such as send when `conversations.send` is missing.
+- `app/reset` clears the slice, so a second account never inherits the first one's permissions.
+- **Known limitation:** permissions are fetched once per session. A mid-session change on the
+  server is picked up on the next launch; a foreground re-fetch belongs with Stage 13.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
 2. Branding assets, Poppins, theme / design system ✔
 3. `network.ts`, `endpoints.ts`, `apis.ts`, Redux, storage, token management ✔
 4. Splash, Login (OTP + password), OTP verification ✔
-5. `/me/bootstrap`, permissions, session restore
+5. `/me/bootstrap`, permissions, session restore ✔
 6. Personal dashboard
 7. Chats list, search, filters, pagination
 8. Message history, older-page loading, mark read
