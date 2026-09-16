@@ -15,10 +15,11 @@ jest.mock('@/services/storage/tokenStorage', () => ({
   },
 }));
 
-jest.mock('@/api/apis', () => ({ getDashboardOverview: jest.fn() }));
+jest.mock('@/api/apis', () => ({ getDashboardOverview: jest.fn(), getConversations: jest.fn() }));
 
 import * as api from '@/api/apis';
-import type { ApiError, DashboardOverview } from '@/api/types';
+import type { ApiError, Conversation, DashboardOverview } from '@/api/types';
+import { conversationPatched } from '@/features/conversations/conversationsSlice';
 import { appReset } from '@/store/actions';
 import { store } from '@/store/store';
 
@@ -27,7 +28,7 @@ import {
   selectDashboardTotals,
   selectPriorityBreakdown,
 } from '../dashboardSelectors';
-import { loadDashboard } from '../dashboardThunks';
+import { loadDashboard, loadRecentConversations } from '../dashboardThunks';
 
 const overview = {
   totals: { total: 124, open: 18, unread: 6, window_open: 4, closed: 99 },
@@ -128,5 +129,71 @@ describe('loadDashboard', () => {
     store.dispatch(appReset());
 
     expect(store.getState().dashboard).toMatchObject({ status: 'idle', overview: null });
+  });
+});
+
+describe('recent conversations', () => {
+  const row = (id: number, fields: Partial<Conversation> = {}): Conversation =>
+    ({ id, status: 'open', unread_count: 0, window_open: true, ...fields }) as Conversation;
+
+  const listWith = (items: Conversation[]) =>
+    jest.mocked(api.getConversations).mockResolvedValue({
+      data: items,
+      meta: { current_page: 1, per_page: 3, total: items.length, last_page: 1 },
+      httpStatus: 200,
+    } as never);
+
+  it("asks for the agent's own conversations, newest page, three rows", async () => {
+    listWith([row(1), row(2), row(3)]);
+
+    await store.dispatch(loadRecentConversations()).unwrap();
+
+    // Personal scope is the server's job (backend blocker 1), never a local filter.
+    expect(api.getConversations).toHaveBeenCalledWith({ assigned: 'mine', page: 1, per_page: 3 });
+    expect(store.getState().dashboard.recent).toMatchObject({ status: 'ready', error: null });
+    expect(store.getState().dashboard.recent.items.map((item) => item.id)).toEqual([1, 2, 3]);
+  });
+
+  it('never shows more than three rows, whatever the server sends', async () => {
+    listWith([row(1), row(2), row(3), row(4), row(5)]);
+
+    await store.dispatch(loadRecentConversations()).unwrap();
+
+    expect(store.getState().dashboard.recent.items).toHaveLength(3);
+  });
+
+  it('fails visibly the first time, but keeps rows it already has', async () => {
+    jest.mocked(api.getConversations).mockRejectedValue({ code: 'SERVER_ERROR', message: 'down' } as ApiError);
+    await store.dispatch(loadRecentConversations());
+    expect(store.getState().dashboard.recent.status).toBe('failed');
+
+    listWith([row(1), row(2)]);
+    await store.dispatch(loadRecentConversations()).unwrap();
+    jest.mocked(api.getConversations).mockRejectedValue({ code: 'OFFLINE', message: 'offline' } as ApiError);
+    await store.dispatch(loadRecentConversations());
+
+    expect(store.getState().dashboard.recent.status).toBe('ready');
+    expect(store.getState().dashboard.recent.items).toHaveLength(2);
+    expect(store.getState().dashboard.recent.error?.code).toBe('OFFLINE');
+  });
+
+  it("follows a conversation changed elsewhere, without refetching", async () => {
+    listWith([row(1, { unread_count: 4 }), row(2)]);
+    await store.dispatch(loadRecentConversations()).unwrap();
+
+    // e.g. CHAT-06 mark-read answering with the updated Conversation.
+    store.dispatch(conversationPatched(row(1, { unread_count: 0 })));
+
+    expect(store.getState().dashboard.recent.items[0].unread_count).toBe(0);
+    expect(api.getConversations).toHaveBeenCalledTimes(1);
+  });
+
+  it('is wiped by a session reset', async () => {
+    listWith([row(1)]);
+    await store.dispatch(loadRecentConversations()).unwrap();
+
+    store.dispatch(appReset());
+
+    expect(store.getState().dashboard.recent).toEqual({ items: [], status: 'idle', error: null });
   });
 });

@@ -1,4 +1,4 @@
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { BrandLogo, IconButton } from '@/components/common';
 import { Spacing } from '@/constants/theme';
@@ -17,6 +17,9 @@ const Copy = {
 export function DashboardHeader() {
   const dispatch = useAppDispatch();
   const authStatus = useAppSelector(selectAuthStatus);
+  // Design screen 4: the wordmark spans about a third of the width.
+  const { width } = useWindowDimensions();
+  const wordmarkWidth = Math.min(150, Math.max(120, Math.round(width * 0.34)));
 
   const confirmSignOut = () => {
     Alert.alert(Copy.confirmTitle, Copy.confirmBody, [
@@ -27,7 +30,7 @@ export function DashboardHeader() {
 
   return (
     <View style={styles.header}>
-      <BrandLogo variant="logoDark" width={104} />
+      <BrandLogo variant="logoDark" width={wordmarkWidth} />
       <IconButton
         icon="log-out-outline"
         accessibilityLabel={Copy.signOut}

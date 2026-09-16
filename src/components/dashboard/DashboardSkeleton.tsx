@@ -20,10 +20,12 @@ export function DashboardSkeleton() {
 
       <View style={styles.grid}>
         {Array.from({ length: 4 }, (_, index) => (
-          <Card key={index} style={styles.metric}>
-            <Skeleton width={36} height={36} radius={Radius.sm} />
-            <Skeleton width="40%" height={22} style={styles.gap} />
-            <Skeleton width="70%" height={12} style={styles.gapSmall} />
+          <Card key={index} style={[styles.metric, styles.metricRow]}>
+            <Skeleton width={24} height={24} radius={Radius.pill} />
+            <View style={styles.metricText}>
+              <Skeleton width="45%" height={20} />
+              <Skeleton width="75%" height={11} style={styles.gapSmall} />
+            </View>
           </Card>
         ))}
       </View>
@@ -41,6 +43,9 @@ const styles = StyleSheet.create({
   container: { gap: Spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
   metric: { flexGrow: 1, flexBasis: '45%', minWidth: 140 },
+  // Same compact shape as MetricCard: icon on the left, number over label.
+  metricRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md },
+  metricText: { flex: 1 },
   gap: { marginTop: Spacing.md },
   gapSmall: { marginTop: Spacing.sm },
 });

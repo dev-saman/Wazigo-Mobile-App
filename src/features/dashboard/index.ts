@@ -8,6 +8,13 @@ export {
   selectDashboardStatus,
   selectDashboardTotals,
   selectPriorityBreakdown,
+  selectRecentConversations,
+  selectRecentConversationsStatus,
 } from './dashboardSelectors';
-export { loadDashboard } from './dashboardThunks';
-export type { DashboardState, DashboardStatus } from './dashboardSlice';
+export { loadDashboard, loadRecentConversations, RECENT_CONVERSATIONS_COUNT } from './dashboardThunks';
+export type {
+  DashboardState,
+  DashboardStatus,
+  RecentConversationsState,
+  RecentConversationsStatus,
+} from './dashboardSlice';

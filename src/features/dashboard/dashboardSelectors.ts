@@ -7,6 +7,8 @@ export const selectDashboardStatus = (state: RootState) => state.dashboard.statu
 export const selectDashboardError = (state: RootState) => state.dashboard.error;
 export const selectDashboardOverview = (state: RootState) => state.dashboard.overview;
 export const selectDashboardLoadedAt = (state: RootState) => state.dashboard.loadedAt;
+export const selectRecentConversations = (state: RootState) => state.dashboard.recent.items;
+export const selectRecentConversationsStatus = (state: RootState) => state.dashboard.recent.status;
 
 const ZERO_TOTALS: DashboardTotals = { total: 0, open: 0, unread: 0, window_open: 0 };
 

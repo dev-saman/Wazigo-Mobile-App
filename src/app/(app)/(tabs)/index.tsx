@@ -7,9 +7,10 @@ import { DashboardSkeleton, MetricCard, StatRow } from '@/components/dashboard';
 import { ErrorState, StaleDataBanner } from '@/components/feedback';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { selectCurrentUser } from '@/features/auth/authSelectors';
-import { RequirePermission } from '@/features/bootstrap';
+import { RequirePermission, usePermission } from '@/features/bootstrap';
 import {
   loadDashboard,
+  loadRecentConversations,
   selectDashboardActivity,
   selectDashboardDelivery,
   selectDashboardError,
@@ -17,9 +18,11 @@ import {
   selectDashboardStatus,
   selectDashboardTotals,
   selectPriorityBreakdown,
+  selectRecentConversationsStatus,
 } from '@/features/dashboard';
 import { DashboardHeader } from '@/features/dashboard/components/DashboardHeader';
 import { GreetingCard } from '@/features/dashboard/components/GreetingCard';
+import { RecentConversations } from '@/features/dashboard/components/RecentConversations';
 import { useLiveRefresh } from '@/features/realtime';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
@@ -69,18 +72,29 @@ function DashboardScreen() {
   const priorities = useAppSelector(selectPriorityBreakdown);
   const activity = useAppSelector(selectDashboardActivity);
   const delivery = useAppSelector(selectDashboardDelivery);
+  // The recent list is conversation data, so it needs its own permission.
+  const canViewConversations = usePermission(Permissions.conversationsView);
+  const recentStatus = useAppSelector(selectRecentConversationsStatus);
 
   useEffect(() => {
     if (status === 'idle') void dispatch(loadDashboard());
   }, [dispatch, status]);
 
+  useEffect(() => {
+    if (canViewConversations && recentStatus === 'idle') void dispatch(loadRecentConversations());
+  }, [canViewConversations, dispatch, recentStatus]);
+
   const refresh = useCallback(() => {
     void dispatch(loadDashboard({ refresh: true }));
-  }, [dispatch]);
+    if (canViewConversations) void dispatch(loadRecentConversations());
+  }, [canViewConversations, dispatch]);
 
   // No socket yet, so the figures catch up on foreground and on reconnect.
   useLiveRefresh(
-    useCallback(() => void dispatch(loadDashboard({ quiet: true })), [dispatch]),
+    useCallback(() => {
+      void dispatch(loadDashboard({ quiet: true }));
+      if (canViewConversations) void dispatch(loadRecentConversations());
+    }, [canViewConversations, dispatch]),
     { loadedAt, enabled: status !== 'failed' },
   );
 
@@ -144,6 +158,8 @@ function DashboardScreen() {
                 hint={Copy.windowHint}
               />
             </View>
+
+            {canViewConversations ? <RecentConversations /> : null}
 
             {priorities.length > 0 ? (
               <View style={styles.section}>
