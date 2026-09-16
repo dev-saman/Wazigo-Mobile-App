@@ -9,6 +9,9 @@ import { Colors, Layout, Radius, Spacing, Typography } from '@/constants/theme';
 /** Warn before the limit rather than at it. */
 const COUNTER_FROM = MessageLimits.textMax - 200;
 
+/** About five lines; longer drafts scroll inside the box. */
+const MAX_INPUT_HEIGHT = 120;
+
 export type MessageComposerProps = {
   value: string;
   onChangeText: (value: string) => void;
@@ -35,6 +38,14 @@ export function MessageComposer({
   placeholder = 'Type a message',
 }: MessageComposerProps) {
   const [height, setHeight] = useState(0);
+  // Forget the old measurement once the draft is cleared, so the next short
+  // message does not start from a long one's height.
+  if (value.length === 0 && height !== 0) setHeight(0);
+  // An empty box is always one line. The measured height is only reported when
+  // the content changes size, and clearing the draft after a long message did
+  // not reliably report the shrink - the empty box stayed at full height.
+  const inputHeight =
+    value.length === 0 ? Layout.minTouch : Math.min(MAX_INPUT_HEIGHT, Math.max(Layout.minTouch, height));
   const length = value.trim().length;
   const tooLong = length > MessageLimits.textMax;
   const canSend = length > 0 && !tooLong && !disabled && !sending;
@@ -65,11 +76,7 @@ export function MessageComposer({
           editable={!disabled}
           accessibilityLabel="Message"
           onContentSizeChange={(event) => setHeight(event.nativeEvent.contentSize.height)}
-          style={[
-            styles.input,
-            { height: Math.min(120, Math.max(Layout.minTouch, height)) },
-            tooLong && styles.inputError,
-          ]}
+          style={[styles.input, { height: inputHeight }, tooLong && styles.inputError]}
         />
 
         <Pressable
