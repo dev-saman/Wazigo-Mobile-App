@@ -371,6 +371,39 @@ src/app/
   and the origin. The design's sent/delivered/read timeline needs per-state timestamps the
   Message resource does not carry.
 
+## Offline, loading and session states (Stage 12)
+
+- `src/components/feedback/errorCopy.ts` (`errorStateFor`, `isOfflineError`, `StateCopy`) +
+  `ErrorState`, `StaleDataBanner`, `OfflineNotice`; the route `(auth)/session-expired`;
+  `ThreadSkeleton`. Design screens 11-14.
+- **Session Expired is a screen, not a banner.** `auth.sessionExpired` closes a guard in
+  `(auth)/_layout.tsx`, so it is the only screen the router can reach until it is acknowledged -
+  an expiry during a background fetch lands there instead of on a half-loaded screen. "Log In
+  Again" only clears the flag; the guard reopens Login and the router moves to it, the same
+  pattern the root layout uses for groups. Login no longer carries the expiry banner.
+- **One offline strip for the whole app**, rendered by `Screen` (so it is not repeated per screen
+  and cannot be forgotten). Login, OTP, the composer and the template form no longer restate it;
+  they say what being offline means for the action in front of the user.
+- **One copy deck for failures.** `errorStateFor` turns an `ApiError` into the icon, tone, title
+  and description a `StateView` needs, so offline, timeout, a dropped connection, 429 and 5xx read
+  identically on the dashboard, the chats list, a thread, the templates picker and the bootstrap
+  gate. A screen supplies only the title for an unrecognised failure. 5xx still never shows raw
+  server text. Two failures keep their own handling because the action differs: 403 on a thread is
+  Access Denied, 404 offers a way back rather than a retry.
+- **A failed refresh keeps what is on screen** in all four slices; `StaleDataBanner` now says so on
+  the chats list, the thread and the templates picker, not only on the dashboard.
+- **Offline refuses cleanly instead of failing obscurely**: the conversation, priority, labels and
+  message sheets disable their actions and explain why (`Sheet` gained a `notice`), and a template
+  cannot be sent. The composer and the attachment button were already disabled.
+- Loading shapes match their content: a bubble-shaped `ThreadSkeleton` replaces the thread's
+  centred spinner, and `SkeletonList` drops the avatar for the template rows.
+- Accessibility: `StateView` keeps its live region and takes an explicit action label
+  (`Retry loading your conversations`), `Banner` and the sheet notice announce themselves,
+  and every skeleton and list footer names what it is loading.
+- **Verified, not assumed:** a refresh whose connection drops keeps the session (new test in
+  `network.test.ts`), alongside the existing 5xx case; timeouts are `isNetworkError`, so they are
+  transient too.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -384,7 +417,7 @@ src/app/
 9. Send text + media ✔
 10. Reply window + templates ✔
 11. Message states, retry, resolve/reopen, conversation actions ✔
-12. Offline, loading, session expired, access denied
+12. Offline, loading, session expired, access denied ✔
 13. Realtime (Reverb) architecture with REST fallback
 14. Cleanup, lint, Expo Doctor, README, backend blockers doc
 15. Commits + push
