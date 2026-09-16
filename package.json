@@ -12,6 +12,7 @@
     "axios": "^1.20.0",
     "expo": "~57.0.23",
     "expo-constants": "~57.0.18",
+    "expo-dev-client": "~57.0.19",
     "expo-device": "~57.0.2",
     "expo-document-picker": "~57.0.2",
     "expo-file-system": "~57.0.7",
@@ -47,8 +48,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "doctor": "npx expo-doctor",

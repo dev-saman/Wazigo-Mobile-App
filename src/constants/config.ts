@@ -58,6 +58,12 @@ export const Config = {
   },
   /** Verbose network logging is only ever enabled in development builds. */
   enableNetworkLogging: __DEV__,
+  /**
+   * `EXPO_PUBLIC_NETWORK_DEBUG=1` also prints query, request body and response
+   * body for every call (credentials redacted). Prints customer data, so opt-in,
+   * and never in a release build.
+   */
+  networkDebug: __DEV__ && process.env.EXPO_PUBLIC_NETWORK_DEBUG === '1',
   /** See `readOnly` above: development builds against production write nothing. */
   readOnly,
 } as const;

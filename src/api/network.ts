@@ -22,6 +22,7 @@ import { Config } from '@/constants/config';
 import { sessionEvents } from '@/services/session/sessionEvents';
 import { tokenStorage } from '@/services/storage/tokenStorage';
 
+import { describeBody, formatDebugValue, redact } from './debugLog';
 import { PUBLIC_PATHS, REFRESH_PATH } from './endpoints';
 import type { ApiEnvelope, ApiError, ApiErrorCode, ApiResponse, SessionPayload, UploadFile } from './types';
 
@@ -219,6 +220,25 @@ const log = (config: AxiosRequestConfig | undefined, outcome: number | string) =
   console.log(`[api] ${(config.method ?? 'get').toUpperCase()} ${stripQuery(config.url)} → ${outcome}${duration}`);
 };
 
+/**
+ * Opt-in (`EXPO_PUBLIC_NETWORK_DEBUG=1`, development only): the full request -
+ * query, body, response body - for when DevTools cannot show it. Credentials are
+ * redacted by `debugLog.ts`; customer content is not, which is why it is opt-in.
+ */
+const logDetail = (config: AxiosRequestConfig | undefined, outcome: number | string, responseBody: unknown) => {
+  if (!Config.networkDebug || !config) return;
+  const method = (config.method ?? 'get').toUpperCase();
+  const params = config.params && Object.keys(config.params).length > 0 ? config.params : undefined;
+  console.log(
+    [
+      `[api:debug] ${method} ${config.url} → ${outcome}`,
+      `  query: ${formatDebugValue(params)}`,
+      `  request body: ${formatDebugValue(describeBody(config.data))}`,
+      `  response body: ${formatDebugValue(redact(responseBody))}`,
+    ].join('\n'),
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Session refresh
 // ---------------------------------------------------------------------------
@@ -340,6 +360,7 @@ client.interceptors.request.use(async (config) => {
 client.interceptors.response.use(
   (response) => {
     log(response.config, response.status);
+    logDetail(response.config, response.status, response.data);
     return response;
   },
   async (error: unknown) => {
@@ -349,6 +370,7 @@ client.interceptors.response.use(
     const config = error.config;
     const status = error.response?.status;
     log(config, status ?? error.code ?? 'ERR');
+    logDetail(config, status ?? error.code ?? 'ERR', error.response?.data);
 
     const canRefresh =
       status === 401 && !!config && needsAuth(config) && !config._isRefresh && !config.skipAuthRefresh && !config._retried;
