@@ -32,7 +32,7 @@ management, settings).
 | 6. Personal dashboard + Home/Chats tabs | done — `efcafa8` |
 | 7. Chats list, search, filters, pagination | done — `c3fbb12` |
 | 8. Message history, older pages, mark read | done — `5f8aefa` |
-| 9. Send text + media | done |
+| 9. Send text + media | done — `6c8c993` |
 | 10. Reply window + templates | **next** |
 | 11–15 | not started (see plan) |
 
