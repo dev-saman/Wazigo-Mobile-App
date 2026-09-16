@@ -464,6 +464,26 @@ carries the app until those answers arrive, and presence.
   dev-only), no `any` or `@ts-ignore`.
 - Terms of Service / Privacy links: still no URLs, still omitted.
 
+## Final verification and dependency audit (Stage 15)
+
+- Every stage was committed and pushed as it finished, so Stage 15 checks the result rather than
+  producing it: **a fresh clone of `origin/main` with `npm ci`** passes lint, typecheck, 182 tests,
+  `expo-doctor` 21/21 and `expo export` for iOS and Android. What is on GitHub rebuilds from the
+  lockfile alone, with no local state (typecheck included — it does not need `npm start` first).
+- **`npm audit` reports 14 moderate findings from two root advisories.** No high or critical ones.
+  - `decode-uri-component` 0.2.2 (GHSA-vcc3-ghjq-m6fr, CVSS 6.6, availability only) via
+    `query-string` 7.1.3 via `expo-router`. This **is** in the app bundle: a deep link with
+    crafted malformed percent-encoding could make the JS thread spin. It is a local denial of
+    service against the user's own app, with no data exposure. Patched in 0.5.0.
+  - `uuid` 7.0.3 (GHSA-w5hq-g745-h8pq) via `xcode` via `@expo/config-plugins`. **Build tooling
+    only** (it edits the Xcode project during prebuild); it never ships in the app.
+- **Do not run `npm audit fix --force`.** Its "fix" is downgrading to `expo` 46 and `expo-router` 5,
+  which would break the whole project. An `overrides` entry forcing `decode-uri-component` 0.5.0
+  under `query-string` 7 was not attempted either: it changes the package's module format, and
+  whether a deep link still parses could only be proven on a device. The right fix is an Expo SDK 57
+  patch that moves `expo-router` off `query-string` 7 — re-check `npm audit` whenever
+  `npx expo install --check` offers one.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -480,7 +500,7 @@ carries the app until those answers arrive, and presence.
 12. Offline, loading, session expired, access denied ✔
 13. REST fallback (foreground / reconnect refresh) + presence ✔ — socket deferred, see above
 14. Cleanup, lint, Expo Doctor, README, backend blockers doc ✔
-15. Commits + push
+15. Commits + push ✔ — verified from a clean clone
 
 ### Dependencies deferred until their stage (compatibility to be verified then)
 - Bottom sheet library (verify against Reanimated 4.5 / RN 0.86) — Stage 9/11
