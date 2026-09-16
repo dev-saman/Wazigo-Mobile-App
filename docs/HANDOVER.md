@@ -31,7 +31,7 @@ management, settings).
 | 5. `/me/bootstrap`, permissions, session restore | done — `d9af3cf` |
 | 6. Personal dashboard + Home/Chats tabs | done — `efcafa8` |
 | 7. Chats list, search, filters, pagination | done — `c3fbb12` |
-| 8. Message history, older pages, mark read | done |
+| 8. Message history, older pages, mark read | done — `5f8aefa` |
 | 9. Send text + media | **next** |
 | 10–15 | not started (see plan) |
 
