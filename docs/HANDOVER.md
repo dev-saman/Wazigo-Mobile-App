@@ -33,7 +33,7 @@ management, settings).
 | 7. Chats list, search, filters, pagination | done — `c3fbb12` |
 | 8. Message history, older pages, mark read | done — `5f8aefa` |
 | 9. Send text + media | done — `6c8c993` |
-| 10. Reply window + templates | done |
+| 10. Reply window + templates | done — `95f720b` |
 | 11. Message states, retry, resolve/reopen, actions | **next** |
 | 12–15 | not started (see plan) |
 
