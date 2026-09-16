@@ -210,6 +210,30 @@ src/app/
 - **Known limitation:** permissions are fetched once per session. A mid-session change on the
   server is picked up on the next launch; a foreground re-fetch belongs with Stage 13.
 
+## Dashboard & tabs (Stage 6)
+
+- `src/features/dashboard/` — slice (`idle|loading|refreshing|ready|failed`, `overview`, `error`,
+  `loadedAt`), `loadDashboard({refresh})` (DASH-01), memoised selectors, and the
+  `DashboardHeader` / `GreetingCard` components. Cards live in `src/components/dashboard/`.
+- **Tabs**: `(app)/(tabs)/` with Home (`/`) and Chats (`/chats`). `Tabs` comes from
+  **`expo-router/js-tabs`** — `import { Tabs } from 'expo-router'` is deprecated in Expo Router 57,
+  and `unstable-native-tabs` cannot carry Poppins labels or the brand greens in this SDK.
+  `(app)/index.tsx` is gone; the tabs group owns `/`.
+- Shown, from DASH-01 only: the four totals (total / open / unread / window_open), the priority
+  breakdown ordered urgent-first, today's and the window's inbound/outbound counts with the
+  busiest day, and delivery (delivered, read, failed, in flight) with the note that
+  **delivered already includes read**. `totals.closed` is ignored - it says `"closed"` while the
+  lifecycle says `"resolved"`.
+- Unrecognised priorities are dropped and missing numbers read as 0, so a payload change cannot
+  print `undefined` on a metric card.
+- The screen is wrapped in `<RequirePermission permission={dashboard.view}>` (the first use of the
+  Stage 5 gate). Loading uses a skeleton shaped like the real layout; a first-load failure shows
+  a retry (offline copy when offline); **a failed pull-to-refresh keeps the visible numbers** and
+  says they are stale rather than blanking the screen.
+- Sign-out moved into the dashboard header (design screen 4) behind a confirmation.
+- **DASH-01 remains a backend blocker**: the figures still count every chat on every number the
+  user can reach. That is a server fix; filtering here would only hide the discrepancy.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
@@ -217,7 +241,7 @@ src/app/
 3. `network.ts`, `endpoints.ts`, `apis.ts`, Redux, storage, token management ✔
 4. Splash, Login (OTP + password), OTP verification ✔
 5. `/me/bootstrap`, permissions, session restore ✔
-6. Personal dashboard
+6. Personal dashboard ✔
 7. Chats list, search, filters, pagination
 8. Message history, older-page loading, mark read
 9. Send text + media

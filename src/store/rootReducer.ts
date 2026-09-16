@@ -3,15 +3,17 @@ import { combineReducers, type UnknownAction } from '@reduxjs/toolkit';
 import { authReducer } from '@/features/auth/authSlice';
 import { bootstrapReducer } from '@/features/bootstrap/bootstrapSlice';
 import { connectivityReducer } from '@/features/connectivity/connectivitySlice';
+import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
 
 import { appReset } from './actions';
 
-// Feature slices (dashboard, conversations, messages, templates, presence) are
-// registered here as their stages are implemented.
+// Feature slices (conversations, messages, templates, presence) are registered
+// here as their stages are implemented.
 const combined = combineReducers({
   auth: authReducer,
   bootstrap: bootstrapReducer,
   connectivity: connectivityReducer,
+  dashboard: dashboardReducer,
 });
 
 export type RootState = ReturnType<typeof combined>;
