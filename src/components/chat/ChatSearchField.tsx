@@ -23,6 +23,8 @@ export function ChatSearchField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
+        // Design screen 5: a soft grey search box rather than an outlined form field.
+        variant="filled"
         accessibilityLabel="Search conversations"
         autoCapitalize="none"
         autoCorrect={false}

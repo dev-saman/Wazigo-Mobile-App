@@ -4,7 +4,12 @@ import { router } from 'expo-router';
 
 import { Permissions, type Conversation } from '@/api/types';
 import { AppText, Screen } from '@/components/common';
-import { ChatFilterChips, ChatSearchField, ConversationRow } from '@/components/chat';
+import {
+  ChatFilterChips,
+  ChatSearchField,
+  ConversationRow,
+  ConversationRowDivider as RowDivider,
+} from '@/components/chat';
 import {
   ErrorState,
   ListFooterLoader,
@@ -27,6 +32,7 @@ import {
   selectConversationsLoadedAt,
   selectConversationsPage,
   selectConversationsStatus,
+  selectConversationsTotal,
   selectHasMoreConversations,
   type ChatFilter,
 } from '@/features/conversations';
@@ -58,6 +64,7 @@ function ChatsScreen() {
   const hasMore = useAppSelector(selectHasMoreConversations);
   const loadedAt = useAppSelector(selectConversationsLoadedAt);
   const page = useAppSelector(selectConversationsPage);
+  const total = useAppSelector(selectConversationsTotal);
   const narrowed = useAppSelector(selectChatQueryIsNarrowed);
 
   const [term, setTerm] = useState(search);
@@ -120,7 +127,8 @@ function ChatsScreen() {
   const failed = status === 'failed';
 
   return (
-    <Screen edges={['top']} padded={false}>
+    // Design screen 5: the chats list sits on white, not the grey page background.
+    <Screen edges={['top']} padded={false} background="surface">
       <View style={styles.header}>
         <AppText variant="h1" accessibilityRole="header">
           {Copy.title}
@@ -128,7 +136,13 @@ function ChatsScreen() {
       </View>
 
       <ChatSearchField value={term} onChangeText={setTerm} />
-      <ChatFilterChips value={filter} onChange={onFilter} />
+      {/* The count belongs to the query on screen, so it is hidden while a new
+          chip or search term is still loading - a stale number would mislead. */}
+      <ChatFilterChips
+        value={filter}
+        onChange={onFilter}
+        activeCount={status === 'loading' || status === 'failed' || status === 'idle' ? null : total}
+      />
 
       {/* A refresh or a next page that failed with rows already listed: the
           rows stay, and this says they may be out of date. */}
@@ -154,7 +168,7 @@ function ChatsScreen() {
           data={conversations}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
-          ItemSeparatorComponent={Separator}
+          ItemSeparatorComponent={RowDivider}
           contentContainerStyle={conversations.length === 0 ? styles.emptyContent : styles.listContent}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
@@ -190,7 +204,6 @@ function ChatsScreen() {
   );
 }
 
-const Separator = () => <View style={styles.separator} />;
 
 export default function ChatsTab() {
   return (
@@ -206,9 +219,4 @@ const styles = StyleSheet.create({
   stale: { paddingHorizontal: Layout.screenPadding },
   listContent: { paddingBottom: Spacing.xxl },
   emptyContent: { flexGrow: 1 },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
-    marginLeft: Layout.screenPadding + 48 + Spacing.md,
-  },
 });

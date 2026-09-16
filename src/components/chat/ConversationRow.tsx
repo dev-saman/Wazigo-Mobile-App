@@ -5,8 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Conversation, MessageType } from '@/api/types';
 import { AppText, Avatar, Badge, type IconName } from '@/components/common';
 import { Colors, Layout, Spacing } from '@/constants/theme';
+import { contactDisplay } from '@/features/conversations/contactDisplay';
 import { formatIstDate, formatIstTime, formatListTimestamp, parseServerDate } from '@/utils/datetime';
-import { formatPhoneForDisplay } from '@/utils/phone';
 
 import { MessageTick } from './MessageTick';
 
@@ -19,18 +19,13 @@ const MEDIA_PREVIEWS: Partial<Record<MessageType, { icon: IconName; label: strin
   template: { icon: 'duplicate-outline', label: 'Template message' },
 };
 
+/** Row avatar size; `ConversationRowDivider` starts where the name does. */
+const AVATAR_SIZE = 48;
+
 const PRIORITY_BADGES = {
   urgent: { label: 'Urgent', tone: 'error' },
   high: { label: 'High', tone: 'warning' },
 } as const;
-
-const displayName = (conversation: Conversation) => {
-  const contact = conversation.contact;
-  const name = contact?.name?.trim();
-  if (name) return name;
-  const phone = contact?.phone ?? contact?.wa_id;
-  return phone ? formatPhoneForDisplay(phone) : 'Unknown contact';
-};
 
 export type ConversationRowProps = {
   conversation: Conversation;
@@ -38,7 +33,8 @@ export type ConversationRowProps = {
 };
 
 function ConversationRowComponent({ conversation, onPress }: ConversationRowProps) {
-  const name = displayName(conversation);
+  const contact = contactDisplay(conversation.contact);
+  const name = contact.title;
   const last = conversation.last_message;
   const media = last?.type ? MEDIA_PREVIEWS[last.type] : undefined;
   const preview = last?.preview?.trim() || media?.label || (last ? 'Message' : 'No messages yet');
@@ -74,7 +70,8 @@ function ConversationRowComponent({ conversation, onPress }: ConversationRowProp
 
   return (
     <Container {...containerProps}>
-      <Avatar name={name} size={48} />
+      {/* The saved name only: initials taken from a phone number are meaningless. */}
+      <Avatar name={contact.name} size={AVATAR_SIZE} />
 
       <View style={styles.body}>
         <View style={styles.line}>
@@ -122,6 +119,14 @@ function ConversationRowComponent({ conversation, onPress }: ConversationRowProp
 
 export const ConversationRow = memo(ConversationRowComponent);
 
+/**
+ * Faint divider between conversation rows (design screen 5), inset to start
+ * under the name rather than under the avatar.
+ */
+export function ConversationRowDivider() {
+  return <View style={styles.divider} />;
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -136,4 +141,9 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   name: { flex: 1 },
   preview: { flex: 1 },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginLeft: Layout.screenPadding + AVATAR_SIZE + Spacing.md,
+  },
 });

@@ -21,6 +21,11 @@ export type TextFieldProps = Omit<TextInputProps, 'style' | 'ref'> & {
   /** Rendered inside the field, after the input (e.g. show-password). */
   trailing?: ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
+  /**
+   * `outline` (default): white with a border, for forms. `filled`: a soft grey
+   * box that only shows a border when focused or in error, for search.
+   */
+  variant?: 'outline' | 'filled';
   ref?: Ref<TextInput>;
 };
 
@@ -35,12 +40,16 @@ export function TextField({
   onFocus,
   onBlur,
   editable = true,
+  variant = 'outline',
   ref,
   ...inputProps
 }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
 
-  const borderColor = error ? Colors.error : focused ? Colors.primary : Colors.borderStrong;
+  const filled = variant === 'filled';
+  const restingBorder = filled ? 'transparent' : Colors.borderStrong;
+  const borderColor = error ? Colors.error : focused ? Colors.primary : restingBorder;
+  const backgroundColor = !editable ? Colors.surfaceMuted : filled ? Colors.grey100 : Colors.surface;
 
   return (
     <View style={containerStyle}>
@@ -51,10 +60,7 @@ export function TextField({
       ) : null}
 
       <View
-        style={[
-          styles.field,
-          { borderColor, backgroundColor: editable ? Colors.surface : Colors.surfaceMuted },
-        ]}
+        style={[styles.field, filled && styles.fieldFilled, { borderColor, backgroundColor }]}
       >
         {leading}
         <TextInput
@@ -99,6 +105,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
   },
+  // Search sits in a toolbar, so it is a touch shorter than a form field.
+  fieldFilled: { minHeight: Layout.touchComfortable, paddingHorizontal: Spacing.md },
   input: {
     flex: 1,
     paddingVertical: Spacing.md,

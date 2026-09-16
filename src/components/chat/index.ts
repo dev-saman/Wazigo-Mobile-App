@@ -2,7 +2,7 @@ export { AttachmentSheet } from './AttachmentSheet';
 export { ChatFilterChips } from './ChatFilterChips';
 export { ConversationActionsSheet } from './ConversationActionsSheet';
 export { ChatSearchField } from './ChatSearchField';
-export { ConversationRow } from './ConversationRow';
+export { ConversationRow, ConversationRowDivider } from './ConversationRow';
 export { DaySeparator, dayLabel } from './DaySeparator';
 export { MediaAttachment } from './MediaAttachment';
 export { LabelsSheet } from './LabelsSheet';
