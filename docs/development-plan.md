@@ -73,7 +73,7 @@ support them:
 | --- | --- | --- |
 | Continue with Google | Login | Only phone + OTP / password login |
 | Terms of Service / Privacy links | Login | No URLs supplied — add when provided |
-| 6-digit OTP boxes | OTP | Backend default is 5 digits; length stays configurable |
+| 6-digit OTP boxes | OTP | Backend default is 5 digits; length is configurable (`EXPO_PUBLIC_OTP_LENGTH`) |
 | Templates / More tabs | Home, Chats | Mobile v1 tabs are Home + Chats only |
 | Pending replies, response rate, customer rating cards | Home | Not in DASH-01; use total / open / unread / window_open |
 | Recent conversations "See all" business list | Home | Dashboard must stay personal; chats live in the Chats tab |
@@ -141,7 +141,8 @@ Errors: `{status:false, message, errors?}`.
    permanent). Needed before the first native build.
 4. ~~Mobile design reference~~ — received 2026-09-15 (see above).
 5. **OTP length** — default is 5 digits but deployment-configurable, and no API returns the
-   configured length. The OTP input will be built length-configurable (default 5).
+   configured length. Built configurable: `Config.otpLength` (`EXPO_PUBLIC_OTP_LENGTH`, default 5,
+   clamped 4-8). Confirm the deployed value during the first real login test.
 6. **tenant_id** — only available as a JWT claim (needed for channel names).
 
 ## Backend blockers (from workbook — none confirmed fixed)
@@ -155,12 +156,39 @@ Errors: `{status:false, message, errors?}`.
    broadcasts other assignees' message content.
 6. Reassignment must revoke previous assignee access immediately.
 
+## Routing & screens (Stage 4)
+
+```
+src/app/
+  _layout.tsx        Provider + fonts + connectivity; runs restoreSession(),
+                     shows the brand splash while auth.status is "unknown",
+                     then opens exactly one group through <Stack.Protected>
+  (auth)/_layout.tsx anchor: login
+    login.tsx        /login  - phone (+91) with OTP or password mode
+    otp.tsx          /otp    - code entry, auto-submit, resend countdown
+  (app)/_layout.tsx  signed-in area (placeholder home until Stages 5-6)
+    index.tsx        /
+```
+
+- There is deliberately **no root `index.tsx`**: `(app)/index` already owns `/`, and the
+  Stage 6 tabs will too. The splash renders from the root layout instead of a route.
+- `Stack.Protected guard={...}` is the Expo Router 57 auth pattern; when a guard closes the
+  router moves to the first screen still available, so no manual redirects are needed.
+- Login state that must outlive a screen (the pending code's phone number and resend
+  cooldown) lives in `auth.otpChallenge`, not in route params.
+- Forms use react-hook-form + zod (`src/features/auth/validation.ts`); one schema covers both
+  login modes so the resolver type stays stable when the user switches.
+- `ApiError` is turned into copy by `src/features/auth/errors.ts` - 422 field errors land on the
+  inputs, everything else becomes one banner. A tailored server message always wins; Laravel's
+  generic "The given data was invalid." does not.
+- Both screens disable submit while `connectivity.isConnected === false`.
+
 ## Stages
 
 1. Environment, Expo, Git, dependencies, base folders ✔
 2. Branding assets, Poppins, theme / design system ✔
 3. `network.ts`, `endpoints.ts`, `apis.ts`, Redux, storage, token management ✔
-4. Splash, Login (OTP + password), OTP verification
+4. Splash, Login (OTP + password), OTP verification ✔
 5. `/me/bootstrap`, permissions, session restore
 6. Personal dashboard
 7. Chats list, search, filters, pagination

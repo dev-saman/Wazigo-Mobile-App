@@ -21,4 +21,4 @@ npm start
 | `npm run lint` | ESLint (eslint-config-expo) |
 | `npm run typecheck` | TypeScript check |
 | `npm run doctor` | Expo Doctor |
-| `npm test` | Jest (network layer + session handling) |
+| `npm test` | Jest (network layer, session, login flow, validation, phone utils) |

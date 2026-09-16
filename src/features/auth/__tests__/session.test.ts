@@ -73,7 +73,12 @@ it('logout revokes the refresh token and clears every private store', async () =
   expect(await AsyncStorage.getItem('wazigo:prefs:chat_filters')).toBeNull();
   expect(await AsyncStorage.getItem('other-app-key')).toBe('keep');
   expect(cleanup).toHaveBeenCalledTimes(1);
-  expect(store.getState().auth).toEqual({ status: 'unauthenticated', user: null, sessionExpired: false });
+  expect(store.getState().auth).toEqual({
+    status: 'unauthenticated',
+    user: null,
+    sessionExpired: false,
+    otpChallenge: null,
+  });
   unregister();
 });
 
@@ -94,6 +99,11 @@ it('an expired-session event resets Redux and flags Session Expired', async () =
   await flush();
   await flush();
 
-  expect(store.getState().auth).toEqual({ status: 'unauthenticated', user: null, sessionExpired: true });
+  expect(store.getState().auth).toEqual({
+    status: 'unauthenticated',
+    user: null,
+    sessionExpired: true,
+    otpChallenge: null,
+  });
   expect(mockSecureStore.size).toBe(0);
 });

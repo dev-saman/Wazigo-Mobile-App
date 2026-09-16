@@ -133,7 +133,8 @@ export function isApiError(value: unknown): value is ApiError {
   );
 }
 
-const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
+/** Copy used when the server sends none - screens can detect an unhelpful default. */
+export const DEFAULT_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   UNAUTHORIZED: 'You need to sign in to continue.',
   SESSION_EXPIRED: 'Your session has expired. Please log in again.',
   FORBIDDEN: "You don't have permission to access this resource.",
@@ -171,17 +172,17 @@ const parseRetryAfter = (value: unknown): number | undefined => {
 /** Converts anything thrown by axios (or this module) into an ApiError. */
 export function normalizeError(error: unknown): ApiError {
   if (isApiError(error)) return error;
-  if (isCancel(error)) return makeError('CANCELLED', DEFAULT_MESSAGES.CANCELLED);
+  if (isCancel(error)) return makeError('CANCELLED', DEFAULT_ERROR_MESSAGES.CANCELLED);
 
   if (isAxiosError(error)) {
     const response = error.response;
 
     if (!response) {
       if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        return makeError('TIMEOUT', DEFAULT_MESSAGES.TIMEOUT, { isTimeout: true, isNetworkError: true });
+        return makeError('TIMEOUT', DEFAULT_ERROR_MESSAGES.TIMEOUT, { isTimeout: true, isNetworkError: true });
       }
       const offline = isOnline === false;
-      return makeError(offline ? 'OFFLINE' : 'NETWORK', DEFAULT_MESSAGES[offline ? 'OFFLINE' : 'NETWORK'], {
+      return makeError(offline ? 'OFFLINE' : 'NETWORK', DEFAULT_ERROR_MESSAGES[offline ? 'OFFLINE' : 'NETWORK'], {
         isNetworkError: true,
         isOffline: offline,
       });
@@ -197,14 +198,14 @@ export function normalizeError(error: unknown): ApiError {
     const errors =
       body.errors && typeof body.errors === 'object' ? (body.errors as Record<string, string[]>) : undefined;
 
-    return makeError(code, code === 'SERVER_ERROR' ? DEFAULT_MESSAGES.SERVER_ERROR : serverMessage ?? DEFAULT_MESSAGES[code], {
+    return makeError(code, code === 'SERVER_ERROR' ? DEFAULT_ERROR_MESSAGES.SERVER_ERROR : serverMessage ?? DEFAULT_ERROR_MESSAGES[code], {
       status,
       errors,
       retryAfterSeconds: status === 429 ? parseRetryAfter(response.headers?.['retry-after']) : undefined,
     });
   }
 
-  return makeError('UNKNOWN', DEFAULT_MESSAGES.UNKNOWN);
+  return makeError('UNKNOWN', DEFAULT_ERROR_MESSAGES.UNKNOWN);
 }
 
 const log = (config: AxiosRequestConfig | undefined, outcome: number | string) => {
@@ -221,7 +222,7 @@ const log = (config: AxiosRequestConfig | undefined, outcome: number | string) =
 async function expireSession(reason: 'refresh_failed' | 'no_refresh_token'): Promise<ApiError> {
   await tokenStorage.clear().catch(() => undefined);
   sessionEvents.emit('expired', { reason });
-  return makeError('SESSION_EXPIRED', DEFAULT_MESSAGES.SESSION_EXPIRED, { status: 401 });
+  return makeError('SESSION_EXPIRED', DEFAULT_ERROR_MESSAGES.SESSION_EXPIRED, { status: 401 });
 }
 
 async function performRefresh(): Promise<string> {
@@ -288,7 +289,7 @@ client.interceptors.request.use(async (config) => {
   config._startedAt = Date.now();
 
   if (isOnline === false) {
-    throw makeError('OFFLINE', DEFAULT_MESSAGES.OFFLINE, { isOffline: true, isNetworkError: true });
+    throw makeError('OFFLINE', DEFAULT_ERROR_MESSAGES.OFFLINE, { isOffline: true, isNetworkError: true });
   }
 
   const isForm = typeof FormData !== 'undefined' && config.data instanceof FormData;
@@ -303,7 +304,7 @@ client.interceptors.request.use(async (config) => {
 
   const token = await getValidAccessToken();
   if (!token) {
-    throw makeError('UNAUTHORIZED', DEFAULT_MESSAGES.UNAUTHORIZED, { status: 401 });
+    throw makeError('UNAUTHORIZED', DEFAULT_ERROR_MESSAGES.UNAUTHORIZED, { status: 401 });
   }
   config.headers.set('Authorization', `Bearer ${token}`);
   config._tokenUsed = token;
@@ -354,7 +355,7 @@ function unwrap<T, M>(response: AxiosResponse, envelope: boolean): ApiResponse<T
   if (envelope && body && typeof body === 'object' && 'data' in body) {
     const env = body as ApiEnvelope<T, M>;
     if (env.status === false) {
-      throw makeError('UNKNOWN', env.message || DEFAULT_MESSAGES.UNKNOWN, { status: response.status });
+      throw makeError('UNKNOWN', env.message || DEFAULT_ERROR_MESSAGES.UNKNOWN, { status: response.status });
     }
     return { data: env.data, message: env.message, meta: env.meta, httpStatus: response.status };
   }
@@ -429,7 +430,7 @@ export const network = {
       throw makeError('FORBIDDEN', 'Refusing to send credentials to an external host.');
     }
     const token = await getValidAccessToken();
-    if (!token) throw makeError('UNAUTHORIZED', DEFAULT_MESSAGES.UNAUTHORIZED, { status: 401 });
+    if (!token) throw makeError('UNAUTHORIZED', DEFAULT_ERROR_MESSAGES.UNAUTHORIZED, { status: 401 });
     return { url, headers: { Accept: '*/*', Authorization: `Bearer ${token}` } };
   },
 
