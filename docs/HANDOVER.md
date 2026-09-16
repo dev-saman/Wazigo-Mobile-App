@@ -28,7 +28,7 @@ management, settings).
 | 2. Branding, Poppins, design system | done — `2851455` |
 | 3. Network layer, APIs, Redux, token storage | done — `88ea399` |
 | 4. Splash + Login (OTP/password) + OTP verification | done — `83e6b2f` |
-| 5. `/me/bootstrap`, permissions, session restore | done |
+| 5. `/me/bootstrap`, permissions, session restore | done — `d9af3cf` |
 | 6. Personal dashboard | **next** |
 | 7–15 | not started (see plan) |
 
