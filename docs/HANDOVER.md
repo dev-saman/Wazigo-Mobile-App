@@ -343,15 +343,29 @@ server sends personal events; fixing blocker 5 needs no app change beyond the ch
   and took down the signed-in area. `pushNotifications.ts` now loads the package lazily, only when
   the native module exists, and otherwise reports `unavailable` (one `[push]` warning). Rebuild the
   development build after any native dependency change: `npx expo run:android`.
+- **pusher-js's types lie about its React Native export.** The second device run crashed with
+  "Object cannot be used as a constructor": the types say `export default Pusher`, the React
+  Native bundle does `module.exports.Pusher = Pusher`. Typecheck and `expo export` both passed.
+  `resolvePusher.ts` finds the class, a test loads the real bundle, and `socketClient` now never
+  throws - any failure is `unavailable` and the 15 s poll takes over.
+- **Verified against production (unauthenticated, 2026-09-17):** `wss://app.wazigo.io/app/<key>`
+  with the public key answers `pusher:connection_established`, and a private channel without a
+  valid signature is refused (4009) - host, port, TLS and key are right; channel auth with a
+  bearer token is the part a signed-in device run still has to prove.
+- **`expo run:android` does NOT re-apply config plugins to an existing `android/` folder.** The
+  local `android/` predates Stage 16, so it has no `google-services` Gradle plugin, no
+  `google-services.json` and no notification icon/channel metadata - an FCM token would fail with
+  "Default FirebaseApp is not initialized". Regenerate it once: `npx expo prebuild --clean
+  --platform android`, then `npx expo run:android`.
 - **Unverified contract: the POST /me/devices body.** The route exists; its field names could not
   be read without signing in. The app sends `token`, `platform`, `provider`, `device_name`. On a
   422 a development build logs the field names the server expected (`[push] register failed`).
 - Config: `app.json` gained the `expo-notifications` plugin (monochrome icon, brand green,
   default channel `messages`) and `android.googleServicesFile`. `google-services.json` is
   gitignored with the FCM/APNs key files; keep a local copy in the project root.
-- Checks: lint, typecheck, **236 tests**, `expo-doctor` 21/21, `expo export --platform android`.
-  **Not run on a device or emulator yet** - native modules changed, so the development build
-  must be rebuilt.
+- Checks: lint, typecheck, **241 tests**, `expo-doctor` 21/21, `expo export --platform android`.
+  Device runs so far found the two crashes above (both fixed); live updates and push have not yet
+  been seen working on a device.
 
 **To finish push (user actions, need an Expo account):**
 
@@ -359,7 +373,8 @@ server sends personal events; fixing blocker 5 needs no app change beyond the ch
 2. `npx eas credentials` → Android → FCM V1 service account key → upload `wazigo-fcm-key.json`.
 3. `npx eas credentials` → iOS → Push Notifications key → upload `AuthKey_8BGC36W5BS.p8`,
    Key ID `8BGC36W5BS`, Team ID `7FU38TU5N4`.
-4. `npx expo run:android` (rebuilds the development build with the new native modules).
+4. `npx expo prebuild --clean --platform android`, then `npx expo run:android` - the clean prebuild
+   is what adds Firebase and the notification config to the existing `android/` folder.
 5. Server: send through Expo's push API with `data.conversation_id` and `channelId: "messages"`.
 
 ### Cleanup and handover (Stage 14)
@@ -568,7 +583,7 @@ npx expo run:android            # build + install the development build (after n
 npx expo start --dev-client     # daily: Metro for the development build (add -c after .env changes)
 npm run lint
 npm run typecheck               # app + test tsconfigs
-npm test                        # jest (236 tests)
+npm test                        # jest (241 tests)
 npm run doctor                  # expo-doctor (21/21)
 adb logcat -v time | grep ReactNativeJS   # app logs incl. [api], [api:write], [ui:write], [api:debug]
 ```
