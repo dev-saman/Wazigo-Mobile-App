@@ -25,11 +25,13 @@ import type {
   PaginationMeta,
   PasswordLoginPayload,
   RefreshPayload,
+  RegisterDevicePayload,
   SendMediaPayload,
   SendTemplatePayload,
   SendTextPayload,
   SessionPayload,
   TemplateListParams,
+  UnregisterDevicePayload,
   UpdateLabelsPayload,
   UpdatePresencePayload,
   UpdatePriorityPayload,
@@ -80,6 +82,19 @@ export const updatePresence = (payload: UpdatePresencePayload) =>
 
 /** CHAT-17 */
 export const sendPresenceHeartbeat = () => network.post<null>(API.me.presenceHeartbeat);
+
+// --- Push devices ---------------------------------------------------------------
+
+/** Registers this phone's Expo push token for the signed-in user. */
+export const registerPushDevice = (payload: RegisterDevicePayload) =>
+  network.post<unknown>(API.me.devices, payload);
+
+/**
+ * Forgets a push token. Called before AUTH-06 on sign-out, while the bearer
+ * token is still valid, and never refreshes: a dead session has nothing to remove.
+ */
+export const unregisterPushDevice = (payload: UnregisterDevicePayload) =>
+  network.delete<unknown>(API.me.devices, { body: payload, skipAuthRefresh: true });
 
 // --- Dashboard ------------------------------------------------------------------
 
@@ -168,6 +183,9 @@ export const stopChatbot = (conversationId: Id) =>
 
 // --- Live updates ---------------------------------------------------------------
 
-/** LIVE-01 — Pusher-style auth response, not the JSON envelope. */
+/**
+ * LIVE-01 — Pusher-style auth response, not the JSON envelope. The server
+ * decides here whether this user may listen on a channel.
+ */
 export const authorizeBroadcastChannel = (payload: BroadcastAuthPayload) =>
-  network.post<BroadcastAuthResponse>(API.broadcasting.auth, payload, { envelope: false });
+  network.post<BroadcastAuthResponse>(API.broadcasting.auth, payload, { envelope: false, readOnlySafe: true });

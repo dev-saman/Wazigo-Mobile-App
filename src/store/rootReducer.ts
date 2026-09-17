@@ -7,11 +7,12 @@ import { conversationsReducer } from '@/features/conversations/conversationsSlic
 import { labelsReducer } from '@/features/conversations/labelsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
 import { messagesReducer } from '@/features/messages/messagesSlice';
+import { realtimeReducer } from '@/features/realtime/realtimeSlice';
 import { templatesReducer } from '@/features/templates/templatesSlice';
 
 import { appReset } from './actions';
 
-// Feature slices (presence) are registered here as their stages are implemented.
+// Presence has no slice: nothing in the design shows the agent's own status.
 const combined = combineReducers({
   auth: authReducer,
   bootstrap: bootstrapReducer,
@@ -20,6 +21,7 @@ const combined = combineReducers({
   dashboard: dashboardReducer,
   labels: labelsReducer,
   messages: messagesReducer,
+  realtime: realtimeReducer,
   templates: templatesReducer,
 });
 

@@ -41,6 +41,7 @@ const payload = {
   ],
   routes: { ignored: true },
   billing: { ignored: true },
+  settings: { tenant: { id: 3, name: 'Wazigo' }, notification_prefs: { mute_sound: false } },
 };
 
 const failWith = (error: ApiError) => jest.mocked(api.getBootstrap).mockRejectedValue(error);
@@ -64,7 +65,10 @@ describe('loadBootstrap', () => {
     ]);
     expect(state.bootstrap.roles).toEqual(['agent']);
     expect(state.bootstrap.numbers).toHaveLength(2);
+    // Live channel names need it; the web app reads it from the same place.
+    expect(state.bootstrap.tenantId).toBe(3);
     expect(state.bootstrap).not.toHaveProperty('routes');
+    expect(state.bootstrap).not.toHaveProperty('settings');
     expect(state.auth.user).toMatchObject({ id: 7, name: 'Asha Rao' });
   });
 
@@ -80,6 +84,7 @@ describe('loadBootstrap', () => {
     expect(bootstrap.roles).toEqual(['supervisor']);
     expect(bootstrap.permissions).toEqual([]);
     expect(bootstrap.numbers).toEqual([]);
+    expect(bootstrap.tenantId).toBeNull();
     expect(bootstrap.status).toBe('ready');
   });
 

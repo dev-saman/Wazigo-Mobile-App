@@ -72,12 +72,26 @@ const conversationsSlice = createSlice({
         lastPage: number;
         total: number;
         mode: LoadMode;
+        /**
+         * A live update of page 1 while the user has paged further: page 1
+         * goes on top in the server's order and the rows they scrolled to stay
+         * below it, instead of being replaced.
+         */
+        merge?: boolean;
       }>,
     ) {
-      const { items, page, lastPage, total, mode } = action.payload;
-      state.items = mode === 'more' ? mergeById(state.items, items) : items;
-      state.page = page;
-      state.lastPage = lastPage;
+      const { items, page, lastPage, total, mode, merge } = action.payload;
+      const keepPages = !!merge && mode !== 'more' && state.page > 1;
+      if (keepPages) {
+        const fresh = new Set(items.map((item) => item.id));
+        state.items = items.concat(state.items.filter((item) => !fresh.has(item.id)));
+        state.page = Math.max(state.page, page);
+        state.lastPage = Math.max(lastPage, state.page);
+      } else {
+        state.items = mode === 'more' ? mergeById(state.items, items) : items;
+        state.page = page;
+        state.lastPage = lastPage;
+      }
       state.total = total;
       state.status = 'ready';
       state.error = null;

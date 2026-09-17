@@ -56,12 +56,17 @@ const fetchPage = async (filter: ChatFilter, search: string, page: number) => {
  * CHAT-01, page 1. `refresh` keeps the current rows visible while it runs;
  * `quiet` also leaves the status alone, for the foreground/reconnect refresh
  * that the user did not ask for - a spinner nobody pulled looks like a fault.
+ * `merge` (live updates) keeps pages the user has already scrolled to.
  */
-export const loadConversations = createAppAsyncThunk<void, { refresh?: boolean; quiet?: boolean } | void>(
+export const loadConversations = createAppAsyncThunk<
+  void,
+  { refresh?: boolean; quiet?: boolean; merge?: boolean } | void
+>(
   'conversations/load',
   async (arg, { dispatch, getState, rejectWithValue }) => {
     const { filter, search } = getState().conversations;
     const quiet = !!(arg && arg.quiet);
+    const merge = !!(arg && arg.merge);
     const mode: LoadMode = arg && (arg.refresh || arg.quiet) ? 'refresh' : 'initial';
     if (!quiet) dispatch(conversationsLoading({ mode }));
 
@@ -74,6 +79,7 @@ export const loadConversations = createAppAsyncThunk<void, { refresh?: boolean; 
           lastPage: meta?.last_page ?? 1,
           total: meta?.total ?? (Array.isArray(data) ? data.length : 0),
           mode,
+          merge,
         }),
       );
     } catch (error) {

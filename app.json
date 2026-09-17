@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "io.wazigo.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#08B74F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -32,6 +33,14 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#08B74F",
+          "defaultChannel": "messages"
+        }
+      ],
       [
         "expo-image-picker",
         {

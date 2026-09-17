@@ -99,22 +99,29 @@ must be 3.
 **Today.** The documented channel is `private-tenant.<tenant>.number.<number>`, which broadcasts to
 everyone with access to that number, carrying message content.
 
-**The app.** **Does not connect at all.** Subscribing would mean receiving other assignees'
-customer messages on a personal device. The app runs on a REST fallback instead: every screen
-refreshes on app foreground and on reconnect, on top of pull-to-refresh. That is slower than live,
-and it is the right trade until this changes.
+**The app (since 2026-09-17).** Connects, as a stopgap decided by the product owner. It joins the
+number channels the web app joins, plus the user's `App.Models.User.<id>` channel, but **uses
+events only as signals**: each event is reduced to a conversation id on arrival, and the list,
+dashboard and open thread are re-queried through CHAT-01/02 and DASH-01. Nothing from a payload is
+stored or shown. **The gap this item describes is still real**: other assignees' message content
+is still delivered to the phone, which is exactly what a personal channel would stop.
 
 **Fixed looks like.** A channel scoped to the recipient — per user, or per conversation with
 membership checked at `/broadcasting/auth` — carrying only conversations that recipient may see.
+The app then only needs its channel names changed (`src/services/socket/channels.ts`).
 
-**Also needed before the app can connect at all** (none of these exist yet):
+**Answered since the first version of this document** (read from the web app and the live API):
+the public Reverb key is the login page's `reverb-key` meta tag; auth is
+`POST /api/v1/broadcasting/auth`; the tenant id is `settings.tenant.id` in `/me/bootstrap`; the
+events are `message.received`, `message.sent`, `message.status`, `conversation.updated` and
+`conversation.assigned`.
 
-| Needed | Why |
-| --- | --- |
-| The public Reverb app key | The client cannot connect without it, and no config endpoint exposes it, so it must be supplied as a build value |
-| Whether `POST /broadcasting/auth` is under `/api/v1` or at the site root | The workbook does not say, and the two are different URLs |
-| `tenant_id`, or a channel name that does not need it | It exists only as a JWT claim today |
-| **The event catalogue** | The workbook documents the channel but never what is broadcast on it. Event names and payload shapes are needed before anything can be mapped onto the Conversation and Message resources |
+**Push (same privacy rule).** The app registers Expo push tokens with `POST /me/devices` and removes
+them with `DELETE /me/devices` on sign-out. Please confirm the request body - the app sends
+`{ token, platform: "ios"|"android", provider: "expo", device_name }` - and send notifications only
+to the conversation's assignee, through Expo's push API, with `data.conversation_id` and Android
+`channelId: "messages"`. A token Expo reports as `DeviceNotRegistered` should be deleted
+server-side, since a session that expires cannot unregister itself.
 
 ## 6. Reassignment must revoke the previous assignee immediately
 
@@ -137,7 +144,8 @@ Not all of these are backend work, but nothing ships without them.
 
 | Value | Needed for | Notes |
 | --- | --- | --- |
-| Reverb app key, `/broadcasting/auth` URL, `tenant_id`, event catalogue | Live updates | See item 5 |
+| ~~Reverb app key, `/broadcasting/auth` URL, `tenant_id`, event catalogue~~ | Live updates | Answered 2026-09-17 - see item 5 |
+| The `POST /me/devices` request body | Push | The route exists; its field names could not be read without signing in. See item 5 |
 | Confirmed OTP length | Login | The backend default is 5 digits and it is deployment-configurable, but no endpoint returns it. The app is built length-configurable and defaults to 5 — please confirm the deployed value |
 | Terms of Service and Privacy Policy URLs | Login screen | The design shows both links; they are omitted until real URLs exist |
 | A test account | The first real login | Ideally one flagged `test_account`, so AUTH-01 returns the review notice and the code is not delivered |

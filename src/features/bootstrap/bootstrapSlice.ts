@@ -19,6 +19,8 @@ export type BootstrapState = {
   permissions: string[];
   roles: RoleName[];
   numbers: WhatsAppNumber[];
+  /** `settings.tenant.id`: part of every live channel name. Null when not sent. */
+  tenantId: number | null;
   /** Kept so the retry screen can explain what went wrong. */
   error: ApiError | null;
   loadedAt: number | null;
@@ -28,6 +30,7 @@ export type BootstrapData = {
   permissions: string[];
   roles: RoleName[];
   numbers: WhatsAppNumber[];
+  tenantId: number | null;
 };
 
 const initialState: BootstrapState = {
@@ -35,6 +38,7 @@ const initialState: BootstrapState = {
   permissions: [],
   roles: [],
   numbers: [],
+  tenantId: null,
   error: null,
   loadedAt: null,
 };
@@ -52,6 +56,7 @@ const bootstrapSlice = createSlice({
       state.permissions = action.payload.permissions;
       state.roles = action.payload.roles;
       state.numbers = action.payload.numbers;
+      state.tenantId = action.payload.tenantId;
       state.error = null;
       state.loadedAt = Date.now();
     },

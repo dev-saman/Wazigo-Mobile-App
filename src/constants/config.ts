@@ -22,6 +22,9 @@ const apiBaseUrl = trimTrailingSlash(
 /** Real customers and real WhatsApp messages live behind this host. */
 const isProductionApi = /^https:\/\/app\.wazigo\.io(\/|$)/.test(apiBaseUrl);
 
+/** Published in the `reverb-key` meta tag of https://app.wazigo.io/login (checked 2026-09-17). */
+const PRODUCTION_REVERB_APP_KEY = 'f1852114c0374fef9a295616c9d9ca8e';
+
 /**
  * Development builds must not change production data by accident: a real
  * WhatsApp message was sent from an emulator on 2026-09-16 during what was
@@ -51,7 +54,13 @@ export const Config = {
   /** AUTH-01 code validity, shown on the OTP screen. */
   otpValidityMinutes: 10,
   reverb: {
-    appKey: process.env.EXPO_PUBLIC_REVERB_APP_KEY ?? '',
+    /**
+     * The PUBLIC app key (not the secret): the web app reads it from the
+     * `reverb-key` meta tag on its own login page. Production's key is the
+     * default; a build against another server passes its own.
+     */
+    appKey:
+      process.env.EXPO_PUBLIC_REVERB_APP_KEY || (isProductionApi ? PRODUCTION_REVERB_APP_KEY : ''),
     host: process.env.EXPO_PUBLIC_REVERB_HOST || 'app.wazigo.io',
     port: Number(process.env.EXPO_PUBLIC_REVERB_PORT || 443),
     scheme: process.env.EXPO_PUBLIC_REVERB_SCHEME || 'https',
@@ -66,4 +75,9 @@ export const Config = {
   networkDebug: __DEV__ && process.env.EXPO_PUBLIC_NETWORK_DEBUG === '1',
   /** See `readOnly` above: development builds against production write nothing. */
   readOnly,
+  /**
+   * EAS project id for Expo push tokens. `eas init` writes it to app.json
+   * (`extra.eas.projectId`), which is read first; this is the fallback.
+   */
+  easProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? '',
 } as const;

@@ -115,7 +115,11 @@ export type WhatsAppNumber = {
   quality_rating?: string | null;
 };
 
-/** Mobile uses user, roles, permissions and numbers only. */
+/**
+ * Mobile uses user, roles, permissions, numbers and `settings.tenant.id` (live
+ * channel names are `tenant.<id>.number.<number>`, and the web app reads the id
+ * from exactly here).
+ */
 export type BootstrapPayload = {
   user: AuthUser;
   roles: RoleName[];
@@ -124,9 +128,20 @@ export type BootstrapPayload = {
   routes?: unknown;
   menus?: unknown;
   feature_flags?: unknown;
-  settings?: unknown;
+  settings?: { tenant?: { id?: number | string | null } | null; [key: string]: unknown } | null;
   billing?: unknown;
 };
+
+/** POST /me/devices — an Expo push token for this phone. */
+export type RegisterDevicePayload = {
+  token: string;
+  platform: 'ios' | 'android';
+  provider: 'expo';
+  device_name: string;
+};
+
+/** DELETE /me/devices — the token to forget. */
+export type UnregisterDevicePayload = { token: string };
 
 /** Permission keys referenced by the workbook. */
 export const Permissions = {

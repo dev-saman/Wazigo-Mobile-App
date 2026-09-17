@@ -20,11 +20,18 @@ const toStringList = (values: unknown): string[] =>
 const toNumbers = (numbers: unknown): WhatsAppNumber[] =>
   Array.isArray(numbers) ? (numbers.filter((item) => item && typeof item === 'object') as WhatsAppNumber[]) : [];
 
-/** Only the four fields mobile uses; routes, menus, flags and billing are ignored. */
+/** A positive integer id, whether the server sends it as a number or a string. */
+const toId = (value: unknown): number | null => {
+  const id = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+};
+
+/** Only the fields mobile uses; routes, menus, flags and billing are ignored. */
 const select = (payload: BootstrapPayload | undefined): BootstrapData => ({
   permissions: toStringList(payload?.permissions),
   roles: toRoleNames(payload?.roles),
   numbers: toNumbers(payload?.numbers),
+  tenantId: toId(payload?.settings?.tenant?.id),
 });
 
 /**

@@ -3,13 +3,18 @@ import { Stack } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { BootstrapGate } from '@/features/bootstrap';
 import { usePresenceMonitor } from '@/features/presence';
+import { usePushNotifications } from '@/features/push/usePushNotifications';
+import { useRealtime } from '@/features/realtime/useRealtime';
 
 /**
- * Everything below the gate: permissions are loaded, so presence (CHAT-16/17)
- * is reported for exactly as long as the signed-in area is on screen.
+ * Everything below the gate: permissions, numbers and the tenant are loaded, so
+ * presence (CHAT-16/17), live updates (Reverb) and push registration run for
+ * exactly as long as the signed-in area is on screen.
  */
 function SignedInArea() {
   usePresenceMonitor();
+  useRealtime();
+  usePushNotifications();
 
   return (
     <Stack

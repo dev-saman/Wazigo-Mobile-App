@@ -44,3 +44,11 @@ example
 
 # local env (keep .env.example committed)
 .env
+
+# Push credentials are handed over privately, never committed.
+# google-services.json is needed by `expo prebuild` / `expo run:android`; keep a
+# local copy in the project root (EAS cloud builds: upload it as a file env var).
+google-services.json
+GoogleService-Info.plist
+*fcm-key*.json
+*firebase-adminsdk*.json

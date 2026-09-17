@@ -49,8 +49,9 @@ binary can read them. Never put an API secret, the Reverb secret or WhatsApp cre
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_BASE_URL` | `https://app.wazigo.io/api/v1` | API root. The origin without `/api/v1` is derived from it for media and broadcast auth |
 | `EXPO_PUBLIC_OTP_LENGTH` | `5` | Login code length. Must match the backend's OTP setting (no endpoint exposes it) |
-| `EXPO_PUBLIC_REVERB_APP_KEY` | *(empty)* | Public Reverb key. **Unused today** — the socket is not connected (see below) |
-| `EXPO_PUBLIC_REVERB_HOST` / `_PORT` / `_SCHEME` | `app.wazigo.io` / `443` / `https` | Reverb endpoint, for when it is |
+| `EXPO_PUBLIC_REVERB_APP_KEY` | production's public key | Public Reverb key (the web login page publishes it). Set it only for another server |
+| `EXPO_PUBLIC_REVERB_HOST` / `_PORT` / `_SCHEME` | `app.wazigo.io` / `443` / `https` | Reverb endpoint |
+| `EXPO_PUBLIC_EAS_PROJECT_ID` | *(empty)* | Fallback for push tokens when `app.json` has no `extra.eas.projectId` (`eas init` writes that) |
 
 ## How it is put together
 
@@ -81,6 +82,8 @@ Rules the linter enforces, because each one has a reason:
 | `expo-secure-store` only in `tokenStorage.ts` | Credentials live in exactly one file |
 | AsyncStorage only in `appStorage.ts` | It is for non-sensitive data only, under a `wazigo:` prefix |
 | `expo-file-system` only in `mediaCache.ts` | Media is fetched with the bearer token, never as a public URL |
+| `pusher-js` only in `services/socket/socketClient.ts` | Socket events become ids at one edge; no screen sees a payload |
+| `expo-notifications` only in `services/push/pushNotifications.ts` | One place owns permissions, tokens and the foreground rule |
 
 Two conventions that are easy to trip over:
 
@@ -105,13 +108,27 @@ means access was taken away and is treated as such.
 
 ### Live updates
 
-**There is no socket.** The app key, the `/broadcasting/auth` location, the `tenant_id` claim and
-the event catalogue are all unknown, and blocker 5 means the one documented channel would deliver
-other assignees' message content to a personal app. Instead every screen refreshes itself when the
-app returns to the foreground and when the device reconnects - quietly, so a refresh nobody asked
-for never blanks a thread - on top of pull-to-refresh. See
-[docs/development-plan.md](docs/development-plan.md) for where the socket goes when those answers
-arrive.
+The app connects to Reverb while it is open and online, on the user's personal channel
+(`private-App.Models.User.<id>`) and on `private-tenant.<tenant>.number.<number>` for each number
+in the bootstrap - the same channels and events as the web app.
+
+**Events are signals, never data.** Number channels still carry other agents' conversations
+(backend blocker 5), so `services/socket/channels.ts` reduces every event to a conversation id
+at the edge. A short burst is batched, and the screens reload through the normal server-scoped
+REST calls: the chats list, the dashboard, and the thread that is open. Those reloads are quiet
+and keep pages or history the user scrolled to.
+
+Underneath it stays the REST fallback: refresh on foreground and on reconnect, pull-to-refresh,
+and a 15 s poll of what is on screen while the socket cannot connect.
+
+### Push notifications
+
+Expo push tokens (one service for FCM and APNs). After sign-in the app asks for permission,
+gets the token and registers it with `POST /me/devices`; sign-out removes it with
+`DELETE /me/devices` before the session is revoked. Tapping a notification opens its chat
+(`conversation_id` in the data), and no banner shows for the chat that is already open.
+Push needs a development or store build, the EAS project (`eas init`), the FCM and APNs keys
+uploaded to EAS, and `google-services.json` in the project root (gitignored).
 
 ## Tests
 

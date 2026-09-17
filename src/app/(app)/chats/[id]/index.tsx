@@ -53,7 +53,7 @@ import {
   sendText,
   type ThreadRow,
 } from '@/features/messages';
-import { useLiveRefresh } from '@/features/realtime';
+import { useActiveConversation, useLiveRefresh } from '@/features/realtime';
 import { pickDocument, pickFromCamera, pickFromLibrary } from '@/services/media/picker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { traceWriteIntent } from '@/utils/devTrace';
@@ -104,17 +104,23 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const [openSheet, setOpenSheet] = useState<'none' | 'conversation' | 'priority' | 'labels'>('none');
   const [actionBusy, setActionBusy] = useState(false);
 
-  const markedRead = useRef(false);
+  // The conversation copy CHAT-06 was last sent for.
+  const markedReadFor = useRef<typeof conversation>(null);
+
+  // Live updates and push treat this thread as the one on screen.
+  useActiveConversation(conversationId);
 
   useEffect(() => {
     void dispatch(loadThread({ conversationId }));
   }, [conversationId, dispatch]);
 
-  // CHAT-06 once per visit, and only when there is a badge to clear.
+  // CHAT-06 only when there is a badge to clear: on opening, and again when a
+  // live update brings in a message while the thread is open. Keyed on the
+  // server's copy, so a failed call is not repeated until something new arrives.
   useEffect(() => {
-    if (markedRead.current || status !== 'ready') return;
-    if (!conversation || conversation.unread_count <= 0) return;
-    markedRead.current = true;
+    if (status !== 'ready' || !conversation || conversation.unread_count <= 0) return;
+    if (markedReadFor.current === conversation) return;
+    markedReadFor.current = conversation;
     void dispatch(markConversationRead({ conversationId }));
   }, [conversation, conversationId, dispatch, status]);
 

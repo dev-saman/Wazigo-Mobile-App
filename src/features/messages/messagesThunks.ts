@@ -10,10 +10,15 @@ const PER_PAGE = 30;
  * CHAT-02. The page is newest-first and `meta.conversation` carries the thread
  * itself, which is fresher than the row the user tapped - that row may have
  * been listed minutes ago.
+ *
+ * `merge` (live updates) keeps older history the user has already loaded.
  */
-export const loadThread = createAppAsyncThunk<void, { conversationId: string; quiet?: boolean }>(
+export const loadThread = createAppAsyncThunk<
+  void,
+  { conversationId: string; quiet?: boolean; merge?: boolean }
+>(
   'messages/loadThread',
-  async ({ conversationId, quiet = false }, { dispatch, rejectWithValue }) => {
+  async ({ conversationId, quiet = false, merge = false }, { dispatch, rejectWithValue }) => {
     // A quiet reload (foreground, reconnect) must not blank a thread the user
     // is reading: no loading status, so the skeleton never replaces it.
     if (!quiet) dispatch(threadLoading({ conversationId, older: false }));
@@ -31,6 +36,7 @@ export const loadThread = createAppAsyncThunk<void, { conversationId: string; qu
           total: meta?.total ?? (Array.isArray(data) ? data.length : 0),
           older: false,
           conversation: meta?.conversation ?? null,
+          merge,
         }),
       );
     } catch (error) {

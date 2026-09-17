@@ -2,6 +2,7 @@ import * as api from '@/api/apis';
 import { network, normalizeError } from '@/api/network';
 import type { AuthUser, OtpRequestResult, SessionPayload } from '@/api/types';
 import { Config } from '@/constants/config';
+import { unregisterPushToken } from '@/features/push/pushRegistration';
 import { clearLocalSession } from '@/services/session/sessionCleanup';
 import { tokenStorage } from '@/services/storage/tokenStorage';
 import { appReset } from '@/store/actions';
@@ -138,6 +139,9 @@ export const restoreSession = createAppAsyncThunk<void, void>(
  */
 export const signOut = createAppAsyncThunk<void, void>('auth/signOut', async (_, { dispatch }) => {
   dispatch(signingOutStarted());
+  // While the bearer token still works: a signed-out phone must stop receiving
+  // this agent's customer notifications. Best-effort, never blocks sign-out.
+  await unregisterPushToken();
   const tokens = await tokenStorage.load().catch(() => null);
   if (tokens?.refreshToken) {
     try {

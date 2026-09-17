@@ -24,6 +24,12 @@ export const API = {
     bootstrap: '/me/bootstrap', // AUTH-05
     presence: '/me/presence', // CHAT-16
     presenceHeartbeat: '/me/presence/heartbeat', // CHAT-17
+    /**
+     * Push device tokens: POST registers this phone, DELETE (token in the body)
+     * removes it. Confirmed on the live API 2026-09-17 ("Supported methods:
+     * POST, DELETE").
+     */
+    devices: '/me/devices',
   },
 
   dashboard: {
@@ -53,8 +59,9 @@ export const API = {
   },
 
   broadcasting: {
-    // LIVE-01. OPEN QUESTION: the workbook does not state whether this lives under
-    // /api/v1 or at the site root. Confirm before Stage 13.
+    // LIVE-01. Under /api/v1, like everything else: the live API answers
+    // "Supported methods: POST" there (2026-09-17), and the web app posts to it
+    // through the same API client it uses for every other call.
     auth: '/broadcasting/auth',
   },
 } as const;

@@ -288,6 +288,38 @@ describe('network.ts', () => {
     jest.mocked(console.log).mockRestore();
   });
 
+  it('in read-only mode, still authorizes socket channels but refuses to register a push device', async () => {
+    const { tokenStorage, api } = load();
+    await tokenStorage.save('access-1', 'refresh-1', 3600);
+    mockReadOnly = true;
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    // Pusher auth is not wrapped in the envelope.
+    handler = (_req, _body, res) => json(res, 200, { auth: 'key:signature' });
+
+    await expect(api.authorizeBroadcastChannel({ socket_id: '1.2', channel_name: 'private-App.Models.User.5' })).resolves.toMatchObject({
+      data: { auth: 'key:signature' },
+    });
+    await expect(
+      api.registerPushDevice({ token: 't', platform: 'android', provider: 'expo', device_name: 'Wazigo Android' }),
+    ).rejects.toMatchObject({ code: 'READ_ONLY' });
+
+    expect(hits.map((hit) => `${hit.method} ${hit.path}`)).toEqual(['POST /api/v1/broadcasting/auth']);
+    expect(hits[0].auth).toBe('Bearer access-1');
+    jest.mocked(console.log).mockRestore();
+  });
+
+  it('sends the push token in the body of DELETE /me/devices', async () => {
+    const { tokenStorage, api } = load();
+    await tokenStorage.save('access-1', 'refresh-1', 3600);
+    handler = (_req, _body, res) => ok(res, null);
+
+    await api.unregisterPushDevice({ token: 'ExponentPushToken[abc]' });
+
+    expect(hits).toHaveLength(1);
+    expect(`${hits[0].method} ${hits[0].path}`).toBe('DELETE /api/v1/me/devices');
+    expect(JSON.parse(hits[0].body)).toEqual({ token: 'ExponentPushToken[abc]' });
+  });
+
   it('never hands credentials to a non-Wazigo host and resolves relative media paths', async () => {
     const { tokenStorage, network } = load();
     await tokenStorage.save('access', 'refresh', 3600);

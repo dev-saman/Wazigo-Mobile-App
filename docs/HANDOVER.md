@@ -41,6 +41,7 @@ management, settings).
 | 14. Cleanup, expo-doctor, README, blockers doc | done — `0724916` |
 | 15. Final commit + push, verified from a clean clone | done — see §3 |
 | After 15: first device run, development build, design pass | done — `7ee56b4` … `df61d76` (see §3, last section) |
+| 16. Live updates over Reverb + push notifications | code done, **not yet run on a device** — see §3 "Live updates and push (Stage 16)" |
 | Next | §7 |
 
 Checks passing at `df61d76`: `npm run lint`, `npm run typecheck`, `npm test` (**210 tests**),
@@ -294,7 +295,72 @@ Screen → feature thunk/hook → src/api/apis.ts → src/api/network.ts → Lar
   dropped, which would have left an agent showing "online" after backgrounding the app.
 - **When the answers arrive**: the socket goes behind `src/services/socket/` and an app-level
   interface (no screen or slice imports the client), registers with `registerSessionCleanup`, and
-  stays gated until blocker 5 is fixed. The REST fallback stays underneath it.
+  stays gated until blocker 5 is fixed. The REST fallback stays underneath it. *(Superseded by
+  Stage 16 below.)*
+
+### Live updates and push (Stage 16)
+
+**Where the missing answers came from (2026-09-17, read-only).**
+
+| Question | Answer | Source |
+| --- | --- | --- |
+| Reverb app key | `f1852114c0374fef9a295616c9d9ca8e` (public) | `reverb-key` meta tag on https://app.wazigo.io/login |
+| `/broadcasting/auth` | `POST /api/v1/broadcasting/auth` | the live API ("Supported methods: POST"), and the web app's API client |
+| `tenant_id` | `settings.tenant.id` in `GET /me/bootstrap` | the web app's settings slice |
+| Events on `tenant.<t>.number.<n>` | `message.received`, `message.sent` (`{message, conversation}`), `message.status` (`{id, conversation_id, status, error_detail, retry}`), `conversation.updated`, `conversation.assigned` (`{conversation}`) | the web app's live-update hook |
+| Personal channel | `App.Models.User.<id>`, Laravel broadcast notifications (`{id, title, body, level, icon, link}`) | same |
+| Device tokens | `POST /api/v1/me/devices`, `DELETE /api/v1/me/devices` | the live API ("Supported methods: POST, DELETE") |
+
+**Decision (user, 2026-09-17): number channels as signals.** The only live message channels are
+still per number (blocker 5). The app subscribes to them, but `signalFromEvent` keeps nothing but
+a conversation id - no text, no contact - and the screens reload through CHAT-01/02 and DASH-01.
+What an agent sees is still decided by the server. The payloads do reach the phone until the
+server sends personal events; fixing blocker 5 needs no app change beyond the channel names.
+
+- `src/services/socket/` - `channels.ts` (names, event → signal, pure and tested) and
+  `socketClient.ts` (the only `pusher-js` importer; channel auth through `network`, so bearer +
+  refresh rules apply; read-only builds still allow the auth POST, it changes no data).
+- `src/features/realtime/` - `realtimeSlice` (socket state, the open thread), `liveSignalBus`
+  (socket and foreground pushes both feed it), `liveBatch` (750 ms batching), `applyLiveBatch`
+  (reloads only what is on screen, respecting permissions), `useRealtime` (connect while
+  foreground + online, disconnect in background, catch up after a reconnect, **15 s poll while
+  the socket is down**) and `useActiveConversation`.
+- **Live reloads merge.** `loadConversations({ merge })` puts page 1 on top of pages already
+  scrolled to; `loadThread({ merge })` keeps loaded history. The Stage 13 foreground refresh
+  still stands down after paging; live updates no longer need to.
+- **Mark read follows live updates.** CHAT-06 was once per visit; it now also runs when a live
+  reload brings unread messages into the open thread (keyed on the server's copy, so a failed
+  call does not loop).
+- `src/services/push/pushNotifications.ts` (the only `expo-notifications` importer) and
+  `src/features/push/` - Android channel `messages`, permission after sign-in, Expo push token
+  registered with `{token, platform, provider: "expo", device_name}`, re-registered when the
+  token rotates, unregistered in `signOut` **before** AUTH-06. Tap opens `/chats/<id>` from
+  `conversation_id` (also `conversationId`, `conversation.id`, or a `link`/`url`), including a
+  notification that launched the app. No banner for the thread already open; a push that
+  arrives while the app is open is also a live signal.
+- **Push must never crash the app.** The first run on a development build made before
+  `expo-notifications` was added threw "Cannot find native module 'ExpoPushTokenManager'" at import
+  and took down the signed-in area. `pushNotifications.ts` now loads the package lazily, only when
+  the native module exists, and otherwise reports `unavailable` (one `[push]` warning). Rebuild the
+  development build after any native dependency change: `npx expo run:android`.
+- **Unverified contract: the POST /me/devices body.** The route exists; its field names could not
+  be read without signing in. The app sends `token`, `platform`, `provider`, `device_name`. On a
+  422 a development build logs the field names the server expected (`[push] register failed`).
+- Config: `app.json` gained the `expo-notifications` plugin (monochrome icon, brand green,
+  default channel `messages`) and `android.googleServicesFile`. `google-services.json` is
+  gitignored with the FCM/APNs key files; keep a local copy in the project root.
+- Checks: lint, typecheck, **236 tests**, `expo-doctor` 21/21, `expo export --platform android`.
+  **Not run on a device or emulator yet** - native modules changed, so the development build
+  must be rebuilt.
+
+**To finish push (user actions, need an Expo account):**
+
+1. `npx eas init` - links the project and writes `extra.eas.projectId` into `app.json`.
+2. `npx eas credentials` → Android → FCM V1 service account key → upload `wazigo-fcm-key.json`.
+3. `npx eas credentials` → iOS → Push Notifications key → upload `AuthKey_8BGC36W5BS.p8`,
+   Key ID `8BGC36W5BS`, Team ID `7FU38TU5N4`.
+4. `npx expo run:android` (rebuilds the development build with the new native modules).
+5. Server: send through Expo's push API with `data.conversation_id` and `channelId: "messages"`.
 
 ### Cleanup and handover (Stage 14)
 
@@ -444,26 +510,22 @@ does not appear there) with the `[ui:write]` / `[api:write]` logs.
 ## 5. Open questions (blocking later stages)
 
 1. ~~**iOS bundle identifier + Android package name**~~ — decided: `io.wazigo.app` for both (Stage 14).
-2. **`/broadcasting/auth` URL** — workbook doesn't say whether it is under `/api/v1` or site root.
-   One of the four things the socket needs.
-3. **Reverb public app key** — no mobile config endpoint exists; must come from
-   `EXPO_PUBLIC_REVERB_APP_KEY`. Also **`tenant_id`**, which exists only as a JWT claim but is
-   needed to name the channel.
+2. ~~**`/broadcasting/auth` URL**~~ — answered: `/api/v1/broadcasting/auth` (Stage 16).
+3. ~~**Reverb public app key** and **`tenant_id`**~~ — answered: the login page's `reverb-key`
+   meta tag, and `settings.tenant.id` in `/me/bootstrap` (Stage 16).
 4. **Terms of Service / Privacy URLs** — design shows the links on Login; omitted until supplied.
 5. **OTP length** — backend default 5, deployment-configurable, not exposed by any API. Real logins
    have worked with the default of 5; confirm that is the deployed setting.
-6. **Live event names and payload shapes** — the workbook documents the channel and
-   `POST /broadcasting/auth` but not what is broadcast. Needed before any event can be mapped onto
-   the Conversation and Message resources.
+6. ~~**Live event names and payload shapes**~~ — answered from the web app (Stage 16). The app
+   uses only the conversation id from each event.
 7. **Opening a document, playing a video or audio** — images download and display inline, but the
    other types are only named. That needs a dependency nobody has chosen: `expo-sharing` to hand a
    file to the OS, `expo-video` / `expo-audio` to play one. Native, so it must be decided before a
    build, not after. Until then the bubble names the file rather than offering a button that fails.
-8. **Push notifications** — nothing exists: no Firebase, no FCM/APNs token, no `expo-notifications`,
-   and the API has no endpoint to register a device token. Needs backend token endpoints, sends that
-   respect assignment, a Firebase project for `io.wazigo.app` (`google-services.json`), an APNs
-   key, and a choice between Expo push tokens and raw FCM/APNs tokens. Push does not work in Expo
-   Go on Android (SDK 53+); the development build is required.
+8. **Push notifications** — app side built in Stage 16 with Expo push tokens; Firebase project,
+   `google-services.json`, the FCM service-account key and the APNs key exist. Still open: `eas
+   init` + uploading both keys to EAS (user), the exact `POST /me/devices` body (unverified), and
+   the server's sends (Expo push API, `data.conversation_id`, only to the assignee).
 9. **Template fallback** — show `delivery_pricing.category` next to "Template message", or not.
 10. **The read-only guard** — the user wants it removed from the code (§3, last section).
 
@@ -473,8 +535,9 @@ does not appear there) with the `[ui:write]` / `[api:write]` logs.
 3. Personal media authorization (CHAT-05) 4. Personal dashboard calculations (DASH-01)
 5. Personal Reverb event delivery 6. Reassignment must revoke old access immediately
 
-Client-side filtering is never the fix. Until the backend is corrected, live updates fall back to
-REST refresh (pull-to-refresh + on app foreground).
+Client-side filtering is never the fix. For blocker 5 the app joins the number channels but uses
+events only as signals to re-query the server (Stage 16, user decision); the payloads still reach
+the phone until the server sends personal events.
 
 ## 7. Next
 
@@ -490,10 +553,11 @@ Pick up from here, in roughly this order:
 4. **Keep matching the design**: Home background (white or not), then screens 6-14 - thread,
    reply-window banners, templates, the conversation and message sheets, and the empty / offline /
    session-expired / access-denied states.
-5. **Decide**: template fallback category (question 9), media viewing (question 7), and whether a
-   short polling interval should stand in for the socket while a thread is open.
-6. **Push notifications** (question 8) and the **socket** (questions 2, 3, 6) both need the backend
-   first. [backend-blockers.md](backend-blockers.md) still lists the six server-side blockers.
+5. **Decide**: template fallback category (question 9) and media viewing (question 7).
+6. **Verify Stage 16 on a device**: rebuild the development build, watch Metro for `[socket]` and
+   `[push]` warnings, send a WhatsApp message to a test number and confirm the list, dashboard and
+   open thread update without pulling; then finish the push steps in §3 Stage 16 and test a
+   notification with the app closed, in the background and on the open chat.
 7. **Docs**: `development-plan.md` has not been updated for anything after Stage 15; this file is
    the current record.
 
@@ -504,7 +568,7 @@ npx expo run:android            # build + install the development build (after n
 npx expo start --dev-client     # daily: Metro for the development build (add -c after .env changes)
 npm run lint
 npm run typecheck               # app + test tsconfigs
-npm test                        # jest (210 tests)
+npm test                        # jest (236 tests)
 npm run doctor                  # expo-doctor (21/21)
 adb logcat -v time | grep ReactNativeJS   # app logs incl. [api], [api:write], [ui:write], [api:debug]
 ```

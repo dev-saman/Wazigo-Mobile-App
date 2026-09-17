@@ -16,7 +16,22 @@ const restricted = {
     name: 'expo-file-system',
     message: 'Use src/services/media/mediaCache.ts so downloads stay authenticated and cached.',
   },
+  pusher: {
+    name: 'pusher-js/react-native',
+    message: 'Only src/services/socket/socketClient.ts may use the socket client; screens get live signals.',
+  },
+  pusherRoot: {
+    name: 'pusher-js',
+    message: 'Only src/services/socket/socketClient.ts may use the socket client; screens get live signals.',
+  },
+  notifications: {
+    name: 'expo-notifications',
+    message: 'Use src/services/push/pushNotifications.ts.',
+  },
 };
+
+const everyRestriction = Object.values(restricted);
+const allExcept = (...allowed) => everyRestriction.filter((path) => !allowed.includes(path));
 
 const restrictImports = (...paths) => ({ 'no-restricted-imports': ['error', { paths }] });
 
@@ -26,28 +41,31 @@ module.exports = defineConfig([
     ignores: ['dist/*'],
   },
   {
-    rules: restrictImports(
-      restricted.axios,
-      restricted.secureStore,
-      restricted.asyncStorage,
-      restricted.fileSystem,
-    ),
+    rules: restrictImports(...everyRestriction),
   },
   {
     files: ['src/api/network.ts'],
-    rules: restrictImports(restricted.secureStore, restricted.asyncStorage, restricted.fileSystem),
+    rules: restrictImports(...allExcept(restricted.axios)),
   },
   {
     files: ['src/services/media/mediaCache.ts'],
-    rules: restrictImports(restricted.axios, restricted.secureStore, restricted.asyncStorage),
+    rules: restrictImports(...allExcept(restricted.fileSystem)),
   },
   {
     files: ['src/services/storage/tokenStorage.ts'],
-    rules: restrictImports(restricted.axios, restricted.asyncStorage, restricted.fileSystem),
+    rules: restrictImports(...allExcept(restricted.secureStore)),
   },
   {
     files: ['src/services/storage/appStorage.ts'],
-    rules: restrictImports(restricted.axios, restricted.secureStore, restricted.fileSystem),
+    rules: restrictImports(...allExcept(restricted.asyncStorage)),
+  },
+  {
+    files: ['src/services/socket/socketClient.ts'],
+    rules: restrictImports(...allExcept(restricted.pusher, restricted.pusherRoot)),
+  },
+  {
+    files: ['src/services/push/pushNotifications.ts'],
+    rules: restrictImports(...allExcept(restricted.notifications)),
   },
   {
     // Tests mock native modules and load isolated module graphs.

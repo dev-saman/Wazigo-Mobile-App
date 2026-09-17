@@ -83,16 +83,30 @@ const messagesSlice = createSlice({
         total: number;
         older: boolean;
         conversation?: Conversation | null;
+        /**
+         * A live update of the newest page while older history is loaded: the
+         * newest page replaces its own messages and the history stays below.
+         */
+        merge?: boolean;
       }>,
     ) {
-      const { conversationId, items, page, lastPage, total, older, conversation } = action.payload;
+      const { conversationId, items, page, lastPage, total, older, conversation, merge } = action.payload;
       const thread = threadOf(state, conversationId);
       // Messages that have not reached the server yet (negative ids) survive a
       // reload: a refresh must never throw away what someone typed.
       const unsent = older ? [] : thread.items.filter((item) => item.id < 0);
-      thread.items = older ? mergeOlder(thread.items, items) : [...unsent, ...items];
-      thread.page = page;
-      thread.lastPage = lastPage;
+      const keepHistory = !!merge && !older && thread.page > 1;
+      if (keepHistory) {
+        const fresh = new Set(items.map((item) => item.id));
+        const history = thread.items.filter((item) => item.id > 0 && !fresh.has(item.id));
+        thread.items = [...unsent, ...items, ...history];
+        thread.page = Math.max(thread.page, page);
+        thread.lastPage = Math.max(lastPage, thread.page);
+      } else {
+        thread.items = older ? mergeOlder(thread.items, items) : [...unsent, ...items];
+        thread.page = page;
+        thread.lastPage = lastPage;
+      }
       thread.total = total;
       thread.status = 'ready';
       thread.error = null;

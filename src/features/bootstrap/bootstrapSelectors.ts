@@ -9,6 +9,7 @@ export const selectBootstrapLoadedAt = (state: RootState) => state.bootstrap.loa
 export const selectPermissions = (state: RootState) => state.bootstrap.permissions;
 export const selectRoles = (state: RootState) => state.bootstrap.roles;
 export const selectNumbers = (state: RootState) => state.bootstrap.numbers;
+export const selectTenantId = (state: RootState) => state.bootstrap.tenantId;
 
 /**
  * Curried so screens can write `useAppSelector(selectHasPermission(key))`.
