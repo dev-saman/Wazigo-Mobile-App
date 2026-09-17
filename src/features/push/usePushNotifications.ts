@@ -86,7 +86,14 @@ export function usePushNotifications() {
       const result = await obtainExpoPushToken({ ask });
       if (cancelled) return;
       if (result.status === 'token') {
-        await registerPushToken(result.token, userId, platform);
+        // Development only: the token lets anyone who has it send this phone a
+        // notification, so it never reaches a release build's logs. Paste it into
+        // https://expo.dev/notifications to test the phone side without the backend.
+        if (__DEV__) console.log(`[push] Expo push token: ${result.token}`);
+        const registered = await registerPushToken(result.token, userId, platform);
+        if (__DEV__ && registered) console.log('[push] device registered with the server (POST /me/devices)');
+      } else if (__DEV__ && result.status === 'denied') {
+        console.log('[push] notification permission not granted; push is off for this device');
       } else if (__DEV__ && result.status === 'unconfigured') {
         console.warn('[push] no EAS project id - run `eas init` (or set EXPO_PUBLIC_EAS_PROJECT_ID); push is off');
       } else if (__DEV__ && result.status === 'failed') {
