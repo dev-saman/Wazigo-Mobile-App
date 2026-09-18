@@ -22,6 +22,7 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
+      "./plugins/with-release-signing",
       "expo-router",
       "expo-dev-client",
       [
