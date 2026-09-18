@@ -1,0 +1,28 @@
+diff --git a/node_modules/expo-modules-core/android/build.gradle b/node_modules/expo-modules-core/android/build.gradle
+index 8dbd405..7090058 100644
+--- a/node_modules/expo-modules-core/android/build.gradle
++++ b/node_modules/expo-modules-core/android/build.gradle
+@@ -293,13 +293,17 @@ def generateStubPCHTask = tasks.register("generateStubPCH") {
+ 
+           def stubHeaderPath = stubHeader.absolutePath.replace('\\', '/')
+ 
+-          def cmd = entry.command
+-            // Replace the forced-include path: `-Xclang -include -Xclang <path>/cmake_pch.hxx`
+-            .replaceAll(/-Xclang -include -Xclang [^\s]+cmake_pch\.hxx(?=\s)/, java.util.regex.Matcher.quoteReplacement("-Xclang -include -Xclang ${stubHeaderPath}"))
+-            // Replace the source file operand: `<path>/cmake_pch.hxx.cxx`
+-            .replaceAll(/[^\s]+cmake_pch\.hxx\.cxx/, java.util.regex.Matcher.quoteReplacement(stubHeaderPath))
++          // compile_commands.json quotes any argument whose path contains a
++          // space, so tokenize on unquoted whitespace and strip the quotes
++          // ourselves -- ProcessBuilder hands these to the compiler directly,
++          // with no shell to do it for us.
++          def args = (entry.command =~ /(?:[^\s"]+|"[^"]*")+/).collect { token ->
++            def arg = token.replace('"', '')
++            // Point the forced include and the source operand at the stub
++            arg.endsWith("cmake_pch.hxx") || arg.endsWith("cmake_pch.hxx.cxx") ? stubHeaderPath : arg
++          }
+ 
+-          def process = new ProcessBuilder(cmd.split(" ").toList())
++          def process = new ProcessBuilder(args)
+             .directory(new File(entry.directory))
+             .redirectErrorStream(true)
+             .start()
