@@ -8,6 +8,12 @@ import type { LiveSignal } from '@/services/socket/channels';
 export type LiveBatch = {
   /** Conversations named by the signals. */
   conversationIds: number[];
+  /**
+   * Conversations reassigned AWAY from this user (LIVE-02 `conversation.assigned`
+   * with `previous_assigned_user_id` = me). They must leave My Chats, and an open
+   * thread for one must close - the person can no longer see it.
+   */
+  assignedAwayIds: number[];
   /** Something can have changed counts or order: list and dashboard reload. */
   lists: boolean;
   /** Catch-up after a reconnect or a poll: reload everything that is on screen. */
@@ -29,14 +35,21 @@ export function createLiveBatcher(
   delayMs: number = LIVE_BATCH_DELAY_MS,
 ): LiveBatcher {
   let ids = new Set<number>();
+  let assignedAway = new Set<number>();
   let lists = false;
   let everything = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const flush = () => {
     timer = null;
-    const batch: LiveBatch = { conversationIds: Array.from(ids), lists, everything };
+    const batch: LiveBatch = {
+      conversationIds: Array.from(ids),
+      assignedAwayIds: Array.from(assignedAway),
+      lists,
+      everything,
+    };
     ids = new Set();
+    assignedAway = new Set();
     lists = false;
     everything = false;
     onFlush(batch);
@@ -51,6 +64,7 @@ export function createLiveBatcher(
   return {
     push(signal) {
       if (signal.conversationId !== null) ids.add(signal.conversationId);
+      if (signal.assignedAway && signal.conversationId !== null) assignedAway.add(signal.conversationId);
       if (signal.affectsLists) lists = true;
       schedule();
     },
@@ -63,6 +77,7 @@ export function createLiveBatcher(
       if (timer) clearTimeout(timer);
       timer = null;
       ids = new Set();
+      assignedAway = new Set();
       lists = false;
       everything = false;
     },

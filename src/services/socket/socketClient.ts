@@ -2,8 +2,9 @@
  * The ONLY module allowed to import pusher-js (ESLint-enforced).
  *
  * Reverb speaks the Pusher protocol, so the Pusher client connects to it
- * directly - the same settings the web app gives Laravel Echo: the public app
- * key, the site host on 443 over TLS, WebSocket transports only.
+ * directly. Since AUTH-05 gained its `realtime` block (2026-09-18) the key,
+ * host, port and scheme come from the SERVER at runtime, not from the bundle -
+ * `appKey` here is whatever bootstrap supplied for this session.
  *
  * Nothing outside this folder sees the client. The app gets `LiveSignal`s
  * (a conversation id, never content - see channels.ts) and a connection state.
@@ -64,6 +65,8 @@ const toSocketState = (state: string): SocketState => {
 
 export function createSocketClient(options: SocketClientOptions): SocketClient {
   let pusher: Pusher | null = null;
+  // Needed to read `conversation.assigned` correctly; set on every connect().
+  let currentUserId: number | null = null;
   const channels = new Map<string, Channel>();
 
   const listen = (name: string) => {
@@ -72,7 +75,7 @@ export function createSocketClient(options: SocketClientOptions): SocketClient {
     channel.bind_global((eventName: string, payload: unknown) => {
       if (eventName.startsWith('pusher:') || eventName.startsWith('pusher_internal:')) return;
       // Reduced to an id here, at the edge: the payload goes no further.
-      const signal = signalFromEvent(eventName, payload);
+      const signal = signalFromEvent(eventName, payload, currentUserId);
       if (signal) options.onSignal(signal);
     });
     channel.bind('pusher:subscription_error', (error: { status?: number } | undefined) => {
@@ -125,6 +128,7 @@ export function createSocketClient(options: SocketClientOptions): SocketClient {
   };
 
   const open = (subscription: LiveSubscription) => {
+    currentUserId = subscription.userId;
     if (!options.appKey) {
       options.onStateChange('unavailable');
       return;
@@ -173,7 +177,9 @@ export function createSocketClient(options: SocketClientOptions): SocketClient {
     }
 
     const wanted = channelsFor(subscription);
-    const names = new Set([wanted.user, ...wanted.numbers]);
+    // LIVE-02: the personal channel only. Number channels carry colleagues'
+    // customers and are deliberately not subscribed to from mobile.
+    const names = new Set([wanted.user, ...(wanted.agent ? [wanted.agent] : [])]);
     Array.from(channels.keys())
       .filter((name) => !names.has(name))
       .forEach(stopListening);

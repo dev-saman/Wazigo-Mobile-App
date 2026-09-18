@@ -5,6 +5,7 @@ import { loadThread } from '@/features/messages/messagesThunks';
 import { createAppAsyncThunk } from '@/store/hooks';
 
 import type { LiveBatch } from './liveBatch';
+import { conversationRevoked } from './realtimeSlice';
 
 /**
  * Answers a live batch with the ordinary REST calls - the same server-scoped
@@ -46,6 +47,13 @@ export const applyLiveBatch = createAppAsyncThunk<void, LiveBatch>(
 
     const active = state.realtime.activeConversationId;
     if (!active || !canViewConversations) return;
+
+    // LIVE-02: reassigned away from me. Refreshing the thread would only earn a
+    // 403 once the server enforces CHAT-02, so leave instead of reloading.
+    if (batch.assignedAwayIds.some((id) => String(id) === active)) {
+      dispatch(conversationRevoked(active));
+      return;
+    }
     const thread = state.messages.byConversation[active];
     if (!thread || thread.loadedAt === null) return;
 

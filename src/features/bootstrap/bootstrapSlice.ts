@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { ApiError, RoleName, WhatsAppNumber } from '@/api/types';
+import type { ApiError, RealtimeConfig, RoleName, WhatsAppNumber } from '@/api/types';
 import { appReset } from '@/store/actions';
 
 export type BootstrapStatus =
@@ -19,8 +19,13 @@ export type BootstrapState = {
   permissions: string[];
   roles: RoleName[];
   numbers: WhatsAppNumber[];
-  /** `settings.tenant.id`: part of every live channel name. Null when not sent. */
+  /** `settings.tenant.id`. Legacy fallback for a server without `realtime`. */
   tenantId: number | null;
+  /**
+   * AUTH-05 addition: socket connection + ready-made channel names. Null when
+   * the deployment has no Reverb, in which case the app stays on REST polling.
+   */
+  realtime: RealtimeConfig | null;
   /** Kept so the retry screen can explain what went wrong. */
   error: ApiError | null;
   loadedAt: number | null;
@@ -31,6 +36,7 @@ export type BootstrapData = {
   roles: RoleName[];
   numbers: WhatsAppNumber[];
   tenantId: number | null;
+  realtime: RealtimeConfig | null;
 };
 
 const initialState: BootstrapState = {
@@ -39,6 +45,7 @@ const initialState: BootstrapState = {
   roles: [],
   numbers: [],
   tenantId: null,
+  realtime: null,
   error: null,
   loadedAt: null,
 };
@@ -57,6 +64,7 @@ const bootstrapSlice = createSlice({
       state.roles = action.payload.roles;
       state.numbers = action.payload.numbers;
       state.tenantId = action.payload.tenantId;
+      state.realtime = action.payload.realtime;
       state.error = null;
       state.loadedAt = Date.now();
     },

@@ -9,8 +9,11 @@ import type {
   BootstrapPayload,
   BroadcastAuthPayload,
   BroadcastAuthResponse,
+  CannedMessage,
+  ContactNote,
   Conversation,
   ConversationListParams,
+  CreateContactNotePayload,
   DashboardOverview,
   Label,
   LogoutPayload,
@@ -33,6 +36,7 @@ import type {
   TemplateListParams,
   UnregisterDevicePayload,
   UpdateLabelsPayload,
+  UpdatePreferencesPayload,
   UpdatePresencePayload,
   UpdatePriorityPayload,
 } from './types';
@@ -82,6 +86,15 @@ export const updatePresence = (payload: UpdatePresencePayload) =>
 
 /** CHAT-17 */
 export const sendPresenceHeartbeat = () => network.post<null>(API.me.presenceHeartbeat);
+
+/**
+ * AUTH-11 — mute pushes / sound for this person on every device.
+ *
+ * Server-side, and shared with the web app's bell mute: this is not a local
+ * notification setting. Returns the updated user (AUTH-08 shape).
+ */
+export const updatePreferences = (payload: UpdatePreferencesPayload) =>
+  network.patch<AuthUser>(API.me.preferences, payload);
 
 // --- Push devices ---------------------------------------------------------------
 
@@ -168,6 +181,24 @@ export const reopenConversation = (conversationId: Id) =>
 
 /** CHAT-13 */
 export const getLabels = () => network.get<Label[]>(API.labels.list);
+
+/**
+ * CHAT-20 — quick replies for the composer. Team + own, unpaged, read-only.
+ * Team bodies may contain `{{contact.name}}`-style variables; substitute them
+ * or let the person edit before sending through CHAT-03.
+ */
+export const getCannedMessages = () => network.get<CannedMessage[]>(API.cannedMessages.list);
+
+/** CHAT-21 — internal notes on the contact of a chat the person can already see. */
+export const getContactNotes = (contactId: Id) =>
+  network.get<ContactNote[]>(API.contacts.notes(contactId));
+
+/** CHAT-22 — add an internal note. Never reaches the customer. body max 2000. */
+export const createContactNote = (contactId: Id, payload: CreateContactNotePayload) =>
+  network.post<ContactNote>(API.contacts.notes(contactId), payload);
+
+/** Optional in phase 1. The server re-checks that only the author or an admin may delete. */
+export const deleteContactNote = (noteId: Id) => network.delete<null>(API.contacts.note(noteId));
 
 /** CHAT-14 — replaces the full label list. */
 export const updateConversationLabels = (conversationId: Id, payload: UpdateLabelsPayload) =>

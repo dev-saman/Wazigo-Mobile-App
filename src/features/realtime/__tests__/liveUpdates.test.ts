@@ -43,7 +43,7 @@ const message = (id: number): Message =>
 
 const signIn = (permissions: string[] = [Permissions.conversationsView, Permissions.dashboardView]) => {
   store.dispatch(signedIn({ id: 5, name: 'Asha' }));
-  store.dispatch(bootstrapLoaded({ permissions, roles: ['agent'], numbers: [], tenantId: 3 }));
+  store.dispatch(bootstrapLoaded({ permissions, roles: ['agent'], numbers: [], tenantId: 3, realtime: null }));
 };
 
 beforeEach(() => {
@@ -54,9 +54,9 @@ beforeEach(() => {
 });
 
 it('does nothing for screens that have not loaded, and nothing when signed out', async () => {
-  await store.dispatch(applyLiveBatch({ conversationIds: [42], lists: true, everything: true }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: true, everything: true }));
   signIn();
-  await store.dispatch(applyLiveBatch({ conversationIds: [42], lists: true, everything: true }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: true, everything: true }));
   await flush();
 
   expect(api.getConversations).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ it('puts the fresh first page on top of the pages the user already scrolled to',
     httpStatus: 200,
   } as never);
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [9], lists: true, everything: false }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [9], assignedAwayIds: [], lists: true, everything: false }));
   await flush();
 
   const { items, page, status } = store.getState().conversations;
@@ -102,11 +102,11 @@ it('refreshes only the open thread, keeping older history, and only when the bat
     httpStatus: 200,
   } as never);
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [7], lists: false, everything: false }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [7], assignedAwayIds: [], lists: false, everything: false }));
   await flush();
   expect(api.getConversationMessages).not.toHaveBeenCalled();
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [42], lists: false, everything: false }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: false, everything: false }));
   await flush();
   const thread = store.getState().messages.byConversation['42'];
   expect(thread.items.map((item) => item.id)).toEqual([21, 20, 19, 18, 17]);
@@ -122,7 +122,7 @@ it('respects permissions: no dashboard call without dashboard.view', async () =>
     httpStatus: 200,
   } as never);
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [], lists: true, everything: true }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [], assignedAwayIds: [], lists: true, everything: true }));
   await flush();
 
   expect(api.getConversations).toHaveBeenCalledTimes(1);

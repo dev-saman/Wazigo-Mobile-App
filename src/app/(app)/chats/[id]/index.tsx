@@ -54,6 +54,10 @@ import {
   type ThreadRow,
 } from '@/features/messages';
 import { useActiveConversation, useLiveRefresh } from '@/features/realtime';
+import {
+  conversationRevocationHandled,
+  selectRevokedConversationId,
+} from '@/features/realtime/realtimeSlice';
 import { pickDocument, pickFromCamera, pickFromLibrary } from '@/services/media/picker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { traceWriteIntent } from '@/utils/devTrace';
@@ -139,6 +143,18 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
     if (router.canGoBack()) router.back();
     else router.replace('/chats');
   }, []);
+
+  /**
+   * LIVE-02: the chat was reassigned to someone else while it was open. The
+   * person has lost access, so the thread closes rather than sitting on stale
+   * messages it can no longer refresh.
+   */
+  const revokedConversationId = useAppSelector(selectRevokedConversationId);
+  useEffect(() => {
+    if (revokedConversationId !== conversationId) return;
+    dispatch(conversationRevocationHandled());
+    goBack();
+  }, [conversationId, dispatch, goBack, revokedConversationId]);
 
   // Inverted: reaching the "end" means the user scrolled up into older history.
   const onEndReached = useCallback(() => {

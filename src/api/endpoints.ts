@@ -30,6 +30,8 @@ export const API = {
      * POST, DELETE").
      */
     devices: '/me/devices',
+    /** AUTH-11: mute_notifications / mute_sound. Server-side push mute. */
+    preferences: '/me/preferences',
   },
 
   dashboard: {
@@ -56,6 +58,18 @@ export const API = {
 
   labels: {
     list: '/labels', // CHAT-13
+  },
+
+  cannedMessages: {
+    // CHAT-20. Returns team + own in one unpaged list.
+    list: '/canned-messages',
+  },
+
+  contacts: {
+    // CHAT-21 (GET) / CHAT-22 (POST). The contact id comes from conversation.contact.id.
+    notes: (contactId: Id) => `/contacts/${encodeURIComponent(String(contactId))}/notes`,
+    // Optional in phase 1; the server re-checks author-or-admin.
+    note: (noteId: Id) => `/contacts/notes/${encodeURIComponent(String(noteId))}`,
   },
 
   broadcasting: {

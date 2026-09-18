@@ -11,6 +11,16 @@ export const selectRoles = (state: RootState) => state.bootstrap.roles;
 export const selectNumbers = (state: RootState) => state.bootstrap.numbers;
 export const selectTenantId = (state: RootState) => state.bootstrap.tenantId;
 
+/** AUTH-05 addition: socket connection details, or null when Reverb is off. */
+export const selectRealtimeConfig = (state: RootState) => state.bootstrap.realtime;
+
+/**
+ * LIVE-02: the one channel mobile subscribes to. The server composes the name
+ * (`tenant.<id>.agent.<user>`), so the app never decodes the JWT for it, and it
+ * carries only conversations assigned to the signed-in person.
+ */
+export const selectAgentChannel = (state: RootState) => state.bootstrap.realtime?.channels?.agent ?? null;
+
 /**
  * Curried so screens can write `useAppSelector(selectHasPermission(key))`.
  * It returns a boolean, so a new selector on every render costs nothing.

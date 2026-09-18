@@ -1,28 +1,36 @@
 /**
  * Live updates: which channels the app joins, and that an event is reduced to a
- * conversation id before it goes anywhere (backend blocker 5 - number channels
- * carry other agents' message content, which must never be used).
+ * conversation id before it goes anywhere.
+ *
+ * Since LIVE-02 the app joins the server-named personal agent channel and NOT
+ * the per-number channels, which carry other agents' message content. The
+ * reduction to an id stays in force regardless.
  */
 import {
+  AGENT_CHANNEL_EVENTS,
   channelsFor,
   conversationIdFromLink,
-  NUMBER_CHANNEL_EVENTS,
   signalFromEvent,
   USER_NOTIFICATION_EVENT,
 } from '../channels';
 
 describe('channelsFor', () => {
-  it('names the personal channel and one private channel per number, as the web app does', () => {
-    expect(channelsFor({ userId: 5, tenantId: 3, numberIds: [12, 7] })).toEqual({
+  it('joins the notification channel and the server-named personal agent channel', () => {
+    expect(channelsFor({ userId: 5, agentChannel: 'tenant.3.agent.5' })).toEqual({
       user: 'private-App.Models.User.5',
-      numbers: ['private-tenant.3.number.7', 'private-tenant.3.number.12'],
+      agent: 'private-tenant.3.agent.5',
     });
   });
 
-  it('drops duplicate and invalid number ids', () => {
-    expect(channelsFor({ userId: 5, tenantId: 3, numberIds: [7, 7, 0, -1, 1.5] }).numbers).toEqual([
-      'private-tenant.3.number.7',
-    ]);
+  it('does not double the private- prefix when the server already sent one', () => {
+    expect(channelsFor({ userId: 5, agentChannel: 'private-tenant.3.agent.5' }).agent).toBe(
+      'private-tenant.3.agent.5',
+    );
+  });
+
+  it('has no agent channel when the server sent none, rather than composing one', () => {
+    expect(channelsFor({ userId: 5, agentChannel: null }).agent).toBeNull();
+    expect(channelsFor({ userId: 5, agentChannel: '  ' }).agent).toBeNull();
   });
 });
 
@@ -39,8 +47,8 @@ describe('signalFromEvent', () => {
     expect(Object.keys(signal ?? {})).toEqual(['conversationId', 'affectsLists']);
   });
 
-  it('handles every number-channel event the web app listens to', () => {
-    expect(NUMBER_CHANNEL_EVENTS).toEqual([
+  it('handles every event the personal agent channel carries', () => {
+    expect(AGENT_CHANNEL_EVENTS).toEqual([
       'message.received',
       'message.sent',
       'message.status',
@@ -62,6 +70,43 @@ describe('signalFromEvent', () => {
     });
     // Nowhere to apply it without a conversation.
     expect(signalFromEvent('message.status', { id: 900, status: 'read' })).toBeNull();
+  });
+
+  it('flags a chat reassigned AWAY from me so the open thread can close', () => {
+    const away = signalFromEvent(
+      'conversation.assigned',
+      { conversation: { id: 42, assigned_user_id: 9 }, previous_assigned_user_id: 5 },
+      5,
+    );
+    expect(away).toEqual({ conversationId: 42, affectsLists: true, assignedAway: true });
+  });
+
+  it('does not flag a chat assigned TO me, or one that was never mine', () => {
+    // Handed to me: previous was someone else.
+    expect(
+      signalFromEvent(
+        'conversation.assigned',
+        { conversation: { id: 42, assigned_user_id: 5 }, previous_assigned_user_id: 9 },
+        5,
+      ),
+    ).toEqual({ conversationId: 42, affectsLists: true });
+
+    // Between two colleagues; the event still reaches me on a catch-up.
+    expect(
+      signalFromEvent(
+        'conversation.assigned',
+        { conversation: { id: 42, assigned_user_id: 9 }, previous_assigned_user_id: 8 },
+        5,
+      ),
+    ).toEqual({ conversationId: 42, affectsLists: true });
+
+    // Without my user id there is nothing to compare against.
+    expect(
+      signalFromEvent('conversation.assigned', {
+        conversation: { id: 42, assigned_user_id: 9 },
+        previous_assigned_user_id: 5,
+      }),
+    ).toEqual({ conversationId: 42, affectsLists: true });
   });
 
   it('ignores events the app does not act on (contacts, templates, presence)', () => {

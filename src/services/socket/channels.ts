@@ -1,44 +1,50 @@
 /**
  * What the app listens to on Reverb, and what it keeps from each event.
  *
- * Channel and event names come from the Wazigo web app's own live-update code
- * (app.wazigo.io, read 2026-09-17) - the workbook documented the channel but not
- * the events. Names are the raw Pusher names: the web app's Echo listeners use a
- * leading dot, which means "no namespace", so `.message.received` arrives here as
- * `message.received`.
+ * LIVE-02 (backend shipped 2026-09-17, documented 2026-09-18). The app now
+ * subscribes to ONE channel: the per-person `tenant.<tenant-id>.agent.<user-id>`,
+ * whose exact name the server composes and hands over in AUTH-05
+ * `data.realtime.channels.agent`. It carries the same five events as the old
+ * number channels but only for conversations assigned to the signed-in person.
+ * The app no longer decodes `tenant_id` from the JWT to build a name by hand.
  *
- * PRIVACY (backend blocker 5): number channels broadcast every conversation on
- * that WhatsApp number, including other agents' customers and their message
- * text. The agreed mitigation until the server sends personal events is that
- * **no event content is ever used**: an event is reduced to a conversation id -
- * a signal that something changed - and the screens reload through the normal,
- * server-scoped REST endpoints. Nothing from a payload is stored, rendered or
- * logged. Do not widen `signalFromEvent` to carry message text or contact data.
+ * PRIVACY: the number channels this app used until now broadcast every
+ * conversation on a WhatsApp number - including other agents' customers and
+ * their message text. They still exist for the web app; mobile must not
+ * subscribe to them. Even so, the mitigation stays in force: an event is
+ * reduced to a conversation id here, at the edge, and the screens reload
+ * through the normal server-scoped REST endpoints. Nothing from a payload is
+ * stored, rendered or logged. Do not widen `signalFromEvent` to carry message
+ * text or contact data.
  */
 
 export type LiveChannels = {
-  /** Personal channel: Laravel database/broadcast notifications for this user. */
+  /** Laravel database/broadcast notifications for this user. */
   user: string;
-  /** One per WhatsApp number the user can access. */
-  numbers: string[];
+  /** LIVE-02 personal inbox channel, or null when the server did not supply one. */
+  agent: string | null;
 };
 
 export type LiveSubscription = {
   userId: number;
-  tenantId: number;
-  numberIds: number[];
+  /**
+   * LIVE-02 channel name exactly as AUTH-05 supplied it, with or without the
+   * `private-` prefix. Null when the server sent no `realtime.channels.agent`.
+   */
+  agentChannel: string | null;
 };
 
+/** Pusher wants the wire name; the server may or may not include the prefix. */
+const privateName = (name: string) => (name.startsWith('private-') ? name : `private-${name}`);
+
 /** Private channel names, including the `private-` prefix Pusher expects. */
-export function channelsFor({ userId, tenantId, numberIds }: LiveSubscription): LiveChannels {
-  const numbers = Array.from(new Set(numberIds.filter((id) => Number.isInteger(id) && id > 0)))
-    .sort((a, b) => a - b)
-    .map((numberId) => `private-tenant.${tenantId}.number.${numberId}`);
-  return { user: `private-App.Models.User.${userId}`, numbers };
+export function channelsFor({ userId, agentChannel }: LiveSubscription): LiveChannels {
+  const agent = typeof agentChannel === 'string' && agentChannel.trim() !== '' ? privateName(agentChannel.trim()) : null;
+  return { user: `private-App.Models.User.${userId}`, agent };
 }
 
-/** Events on a number channel. Every one of them names a conversation. */
-export const NUMBER_CHANNEL_EVENTS = [
+/** Events on the personal agent channel. Every one of them names a conversation. */
+export const AGENT_CHANNEL_EVENTS = [
   'message.received',
   'message.sent',
   'message.status',
@@ -57,6 +63,12 @@ export type LiveSignal = {
    * as opposed to a delivery tick on an existing message.
    */
   affectsLists: boolean;
+  /**
+   * `conversation.assigned` only: this chat just moved AWAY from me, so it must
+   * leave My Chats and the open thread must close. The server sends the event to
+   * both the new assignee and the previous one, so "assigned" alone is ambiguous.
+   */
+  assignedAway?: boolean;
 };
 
 const positiveId = (value: unknown): number | null => {
@@ -77,8 +89,12 @@ export function conversationIdFromLink(link: unknown): number | null {
 /**
  * Reduces an event to the only thing the app uses: which conversation changed.
  * Returns null for events the app does not act on.
+ *
+ * `myUserId` is needed only for `conversation.assigned`: comparing
+ * `previous_assigned_user_id` with `conversation.assigned_user_id` is the only
+ * way to tell "this is now mine" from "this was mine and no longer is".
  */
-export function signalFromEvent(eventName: string, payload: unknown): LiveSignal | null {
+export function signalFromEvent(eventName: string, payload: unknown, myUserId?: number | null): LiveSignal | null {
   const data = record(payload);
 
   if (eventName === USER_NOTIFICATION_EVENT) {
@@ -87,7 +103,7 @@ export function signalFromEvent(eventName: string, payload: unknown): LiveSignal
     return { conversationId: id, affectsLists: true };
   }
 
-  if (!(NUMBER_CHANNEL_EVENTS as readonly string[]).includes(eventName)) return null;
+  if (!(AGENT_CHANNEL_EVENTS as readonly string[]).includes(eventName)) return null;
 
   const conversation = record(data?.conversation);
   const message = record(data?.message);
@@ -99,5 +115,19 @@ export function signalFromEvent(eventName: string, payload: unknown): LiveSignal
   // A status event without a conversation id cannot be placed; ignore it.
   if (id === null && eventName === 'message.status') return null;
 
-  return { conversationId: id, affectsLists: eventName !== 'message.status' };
+  // 2026-09-18 addition: previous_assigned_user_id. Mine before, not mine now.
+  let assignedAway = false;
+  if (eventName === 'conversation.assigned' && typeof myUserId === 'number') {
+    const previous = positiveId(data?.previous_assigned_user_id);
+    const current = positiveId(conversation?.assigned_user_id);
+    assignedAway = previous === myUserId && current !== myUserId;
+  }
+
+  // Present only when true, so the signal keeps the smallest possible key set
+  // and the privacy guard on its shape stays meaningful.
+  return {
+    conversationId: id,
+    affectsLists: eventName !== 'message.status',
+    ...(assignedAway ? { assignedAway: true } : {}),
+  };
 }

@@ -23,6 +23,7 @@ jest.mock('@/api/apis', () => ({
 
 import * as api from '@/api/apis';
 import { signOut } from '@/features/auth/authThunks';
+import { tokenStorage } from '@/services/storage/tokenStorage';
 import { store } from '@/store/store';
 
 import { forgetPushToken, registeredPushToken, registerPushToken, unregisterPushToken } from '../pushRegistration';
@@ -91,20 +92,34 @@ describe('device registration', () => {
     expect(api.unregisterPushDevice).toHaveBeenCalledTimes(1);
   });
 
-  it('sign-out removes the device before the session is revoked', async () => {
+  /**
+   * AUTH-06 addition (2026-09-18): logout carries the push token, so the revoke
+   * and the token removal are one call. A logout that dies halfway can no longer
+   * leave the phone ringing for a signed-out account, and the extra DELETE that
+   * used to precede it is gone.
+   */
+  it('sign-out hands the push token to logout instead of a separate DELETE', async () => {
     await registerPushToken('ExponentPushToken[abc]', 5, 'android');
-    const order: string[] = [];
-    jest.mocked(api.unregisterPushDevice).mockImplementation(async () => {
-      order.push('unregister');
-      return { data: null, httpStatus: 200 } as never;
-    });
-    jest.mocked(api.logout).mockImplementation(async () => {
-      order.push('logout');
-      return { data: null, httpStatus: 200 };
-    });
+    jest.mocked(api.logout).mockResolvedValue({ data: null, httpStatus: 200 });
 
     await store.dispatch(signOut());
 
-    expect(order).toEqual(['unregister', 'logout']);
+    expect(api.logout).toHaveBeenCalledWith(
+      expect.objectContaining({ device_token: 'ExponentPushToken[abc]' }),
+    );
+    expect(api.unregisterPushDevice).not.toHaveBeenCalled();
+    expect(registeredPushToken()).toBeNull();
+  });
+
+  it('still removes the token through AUTH-10 when there is no session to revoke', async () => {
+    await registerPushToken('ExponentPushToken[abc]', 5, 'android');
+    // Nothing stored to revoke, so AUTH-06 is never sent.
+    jest.mocked(tokenStorage.load).mockResolvedValueOnce(null);
+    jest.mocked(api.unregisterPushDevice).mockResolvedValue({ data: null, httpStatus: 200 } as never);
+
+    await store.dispatch(signOut());
+
+    expect(api.logout).not.toHaveBeenCalled();
+    expect(api.unregisterPushDevice).toHaveBeenCalledWith({ token: 'ExponentPushToken[abc]' });
   });
 });

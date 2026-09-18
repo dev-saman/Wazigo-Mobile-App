@@ -39,15 +39,26 @@ export async function registerPushToken(token: string, userId: number, platform:
  * stops receiving the agent's customer notifications. Best-effort: offline or
  * an already-dead session must not block signing out.
  */
-export async function unregisterPushToken(): Promise<void> {
-  const current = registered;
+export async function unregisterPushToken(token?: string): Promise<void> {
+  const target = token ?? registered?.token ?? null;
   registered = null;
-  if (!current) return;
+  if (!target) return;
   try {
-    await api.unregisterPushDevice({ token: current.token });
+    await api.unregisterPushDevice({ token: target });
   } catch (error) {
     warn('unregister', normalizeError(error));
   }
+}
+
+/**
+ * AUTH-06 addition: hands the token to the logout call instead of spending a
+ * separate DELETE on it. Forgets it locally in the same step, so the caller owns
+ * the only copy and cannot double-remove it.
+ */
+export function takePushToken(): string | null {
+  const current = registered;
+  registered = null;
+  return current?.token ?? null;
 }
 
 /** Session expiry: the server can no longer be told, so only forget locally. */

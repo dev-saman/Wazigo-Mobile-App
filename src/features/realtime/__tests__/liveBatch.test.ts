@@ -14,7 +14,12 @@ it('answers a burst of events with one refresh', () => {
 
   jest.advanceTimersByTime(LIVE_BATCH_DELAY_MS);
   expect(flush).toHaveBeenCalledTimes(1);
-  expect(flush).toHaveBeenCalledWith({ conversationIds: [42, 7], lists: true, everything: false });
+  expect(flush).toHaveBeenCalledWith({
+    conversationIds: [42, 7],
+    assignedAwayIds: [],
+    lists: true,
+    everything: false,
+  });
 });
 
 it('does not keep postponing the refresh while events keep coming', () => {
@@ -35,7 +40,12 @@ it('a delivery tick alone does not reload lists', () => {
   const batcher = createLiveBatcher(flush);
   batcher.push({ conversationId: 3, affectsLists: false });
   jest.runAllTimers();
-  expect(flush).toHaveBeenCalledWith({ conversationIds: [3], lists: false, everything: false });
+  expect(flush).toHaveBeenCalledWith({
+    conversationIds: [3],
+    assignedAwayIds: [],
+    lists: false,
+    everything: false,
+  });
 });
 
 it('a catch-up asks for everything on screen', () => {
@@ -43,7 +53,21 @@ it('a catch-up asks for everything on screen', () => {
   const batcher = createLiveBatcher(flush);
   batcher.pushEverything();
   jest.runAllTimers();
-  expect(flush).toHaveBeenCalledWith({ conversationIds: [], lists: true, everything: true });
+  expect(flush).toHaveBeenCalledWith({
+    conversationIds: [],
+    assignedAwayIds: [],
+    lists: true,
+    everything: true,
+  });
+});
+
+it('carries a chat reassigned away, so the open thread can be closed', () => {
+  const flush = jest.fn();
+  const batcher = createLiveBatcher(flush);
+  batcher.push({ conversationId: 42, affectsLists: true, assignedAway: true });
+  batcher.push({ conversationId: 7, affectsLists: true });
+  jest.runAllTimers();
+  expect(flush.mock.calls[0][0].assignedAwayIds).toEqual([42]);
 });
 
 it('cancel drops what was pending', () => {

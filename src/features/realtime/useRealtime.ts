@@ -2,9 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import * as api from '@/api/apis';
-import { Config } from '@/constants/config';
 import { selectCurrentUser } from '@/features/auth/authSelectors';
-import { selectNumbers, selectTenantId } from '@/features/bootstrap/bootstrapSelectors';
+import { selectAgentChannel, selectRealtimeConfig } from '@/features/bootstrap/bootstrapSelectors';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import { createSocketClient, type SocketClient, type SocketState } from '@/services/socket/socketClient';
 import { registerSessionCleanup } from '@/services/session/sessionCleanup';
@@ -23,31 +22,40 @@ export const POLL_WHILE_DISCONNECTED_MS = 15_000;
  *
  * - Connects to Reverb while the app is in the foreground and online, and
  *   disconnects in the background - push notifications cover a closed app.
- * - Listens on the user's personal channel and on each WhatsApp number the
- *   bootstrap lists. Events are signals only (see services/socket/channels.ts).
+ * - Connection details and the channel name both come from AUTH-05
+ *   `data.realtime` (2026-09-18). Nothing about the socket is bundled any more.
+ * - Listens on the user's notification channel and the LIVE-02 personal agent
+ *   channel - never the per-number channels, which carry colleagues' customers.
+ *   Events are signals only (see services/socket/channels.ts).
  * - After a reconnect it catches up once; while it cannot connect at all it
  *   falls back to a 15 s poll of whatever is on screen.
  */
 export function useRealtime() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
-  const tenantId = useAppSelector(selectTenantId);
-  const numbers = useAppSelector(selectNumbers);
+  const realtime = useAppSelector(selectRealtimeConfig);
+  const agentChannel = useAppSelector(selectAgentChannel);
   const offline = useAppSelector(selectIsOffline);
 
   const [foreground, setForeground] = useState(AppState.currentState !== 'background');
   const [socketState, setSocketState] = useState<SocketState>('disconnected');
 
   const userId = typeof user?.id === 'number' ? user.id : null;
-  // A string key, so a bootstrap re-fetch with the same numbers does not resubscribe.
-  const numberKey = useMemo(
-    () =>
-      numbers
-        .map((number) => number.id)
-        .filter((id) => Number.isInteger(id))
-        .sort((a, b) => a - b)
-        .join(','),
-    [numbers],
+
+  /**
+   * Entirely server-supplied (AUTH-05 `data.realtime`). Nothing about the socket
+   * is bundled: a build carries no app key, no host, no port. When the server
+   * sends no `realtime` block there is nothing to connect to and the app lives
+   * on the REST poll below - the documented behaviour for `realtime: null`.
+   */
+  const connection = useMemo(
+    () => ({
+      appKey: realtime?.key ?? '',
+      host: realtime?.host ?? '',
+      port: realtime?.port ?? 443,
+      scheme: realtime?.scheme ?? 'https',
+    }),
+    [realtime?.key, realtime?.host, realtime?.port, realtime?.scheme],
   );
 
   // One batcher per mount (lazy state initializer), one socket client per effect run.
@@ -75,10 +83,10 @@ export function useRealtime() {
 
   useEffect(() => {
     const client = createSocketClient({
-      appKey: Config.reverb.appKey,
-      host: Config.reverb.host,
-      port: Config.reverb.port,
-      scheme: Config.reverb.scheme,
+      appKey: connection.appKey,
+      host: connection.host,
+      port: connection.port,
+      scheme: connection.scheme,
       authorize: async (payload) => (await api.authorizeBroadcastChannel(payload)).data,
       onSignal: (signal) => liveSignalBus.emit(signal),
       onStateChange: (state) => {
@@ -94,20 +102,21 @@ export function useRealtime() {
       client.disconnect();
       clientRef.current = null;
     };
-  }, [dispatch]);
+  }, [connection, dispatch]);
 
-  const canConnect = foreground && !offline && userId !== null && tenantId !== null;
+  // No agent channel means the server has nothing personal to deliver here;
+  // connecting anyway would only subscribe to the notification channel.
+  const canConnect = foreground && !offline && userId !== null && Boolean(agentChannel);
 
   useEffect(() => {
     const client = clientRef.current;
     if (!client) return;
-    if (!canConnect || userId === null || tenantId === null) {
+    if (!canConnect || userId === null) {
       client.disconnect();
       return;
     }
-    const numberIds = numberKey ? numberKey.split(',').map(Number) : [];
-    client.connect({ userId, tenantId, numberIds });
-  }, [canConnect, numberKey, tenantId, userId]);
+    client.connect({ userId, agentChannel });
+  }, [agentChannel, canConnect, userId]);
 
   // Catch up once after the connection comes back; the first connection of the
   // session needs nothing, the screens have only just loaded.

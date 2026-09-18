@@ -1,6 +1,6 @@
 import * as api from '@/api/apis';
 import { normalizeError } from '@/api/network';
-import type { BootstrapPayload, RoleName, WhatsAppNumber } from '@/api/types';
+import type { BootstrapPayload, RealtimeConfig, RoleName, WhatsAppNumber } from '@/api/types';
 import { userUpdated } from '@/features/auth/authSlice';
 import { createAppAsyncThunk } from '@/store/hooks';
 
@@ -26,12 +26,48 @@ const toId = (value: unknown): number | null => {
   return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
 };
 
+/**
+ * AUTH-05 addition. Validated rather than trusted: a half-filled block (no key,
+ * no host) is worse than none, because the socket would fail on every attempt
+ * instead of falling straight through to the REST poll.
+ */
+const toRealtime = (value: unknown): RealtimeConfig | null => {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const key = typeof raw.key === 'string' ? raw.key.trim() : '';
+  const host = typeof raw.host === 'string' ? raw.host.trim() : '';
+  if (!key || !host) return null;
+
+  const port = Number(raw.port);
+  const scheme = raw.scheme === 'http' ? 'http' : 'https';
+  const channels = raw.channels && typeof raw.channels === 'object' ? (raw.channels as Record<string, unknown>) : {};
+  const text = (candidate: unknown) =>
+    typeof candidate === 'string' && candidate.trim() !== '' ? candidate.trim() : null;
+
+  return {
+    key,
+    host,
+    port: Number.isFinite(port) && port > 0 ? port : scheme === 'https' ? 443 : 80,
+    scheme,
+    auth_path: text(raw.auth_path) ?? '/api/v1/broadcasting/auth',
+    channels: {
+      agent: text(channels.agent),
+      numbers: Array.isArray(channels.numbers)
+        ? channels.numbers.filter((name): name is string => typeof name === 'string' && name.trim() !== '')
+        : null,
+      tenant: text(channels.tenant),
+      user: text(channels.user),
+    },
+  };
+};
+
 /** Only the fields mobile uses; routes, menus, flags and billing are ignored. */
 const select = (payload: BootstrapPayload | undefined): BootstrapData => ({
   permissions: toStringList(payload?.permissions),
   roles: toRoleNames(payload?.roles),
   numbers: toNumbers(payload?.numbers),
   tenantId: toId(payload?.settings?.tenant?.id),
+  realtime: toRealtime(payload?.realtime),
 });
 
 /**

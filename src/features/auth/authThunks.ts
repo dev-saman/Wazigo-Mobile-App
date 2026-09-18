@@ -2,7 +2,7 @@ import * as api from '@/api/apis';
 import { network, normalizeError } from '@/api/network';
 import type { AuthUser, OtpRequestResult, SessionPayload } from '@/api/types';
 import { Config } from '@/constants/config';
-import { unregisterPushToken } from '@/features/push/pushRegistration';
+import { takePushToken, unregisterPushToken } from '@/features/push/pushRegistration';
 import { clearLocalSession } from '@/services/session/sessionCleanup';
 import { tokenStorage } from '@/services/storage/tokenStorage';
 import { appReset } from '@/store/actions';
@@ -139,16 +139,24 @@ export const restoreSession = createAppAsyncThunk<void, void>(
  */
 export const signOut = createAppAsyncThunk<void, void>('auth/signOut', async (_, { dispatch }) => {
   dispatch(signingOutStarted());
-  // While the bearer token still works: a signed-out phone must stop receiving
-  // this agent's customer notifications. Best-effort, never blocks sign-out.
-  await unregisterPushToken();
+  // A signed-out phone must stop receiving this agent's customer notifications.
+  // AUTH-06 takes the push token inline (2026-09-18), so the revoke and the
+  // token removal are one call that cannot half-succeed. Best-effort either way:
+  // neither blocks sign-out.
+  const deviceToken = takePushToken();
   const tokens = await tokenStorage.load().catch(() => null);
   if (tokens?.refreshToken) {
     try {
-      await api.logout({ refresh_token: tokens.refreshToken });
+      await api.logout({
+        refresh_token: tokens.refreshToken,
+        ...(deviceToken ? { device_token: deviceToken } : {}),
+      });
     } catch {
       // Offline or already-invalid session: local sign-out still proceeds.
     }
+  } else if (deviceToken) {
+    // No refresh token to revoke, so AUTH-06 is never sent; AUTH-10 still can be.
+    await unregisterPushToken(deviceToken);
   }
   await clearLocalSession();
   dispatch(appReset());

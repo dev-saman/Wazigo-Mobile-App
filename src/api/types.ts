@@ -83,6 +83,10 @@ export type AuthUser = {
   is_active?: boolean;
   presence_status?: PresenceStatus | null;
   roles?: RoleName[] | { name: RoleName }[];
+  /** AUTH-11. Server-side push mute, shared with the web app's bell. */
+  mute_notifications?: boolean;
+  /** AUTH-11. Silences the notification sound without stopping delivery. */
+  mute_sound?: boolean;
   [key: string]: unknown;
 };
 
@@ -93,7 +97,12 @@ export type OtpNoticePayload = { phone: string };
 export type OtpLoginPayload = { phone: string; code: string; device_name?: string };
 export type PasswordLoginPayload = { phone: string; password: string; device_name?: string };
 export type RefreshPayload = { refresh_token: string };
-export type LogoutPayload = { refresh_token: string };
+/**
+ * AUTH-06, plus the 2026-09-18 addition: `device_token` lets the server drop
+ * this phone's push token in the same call, so a logout that loses connectivity
+ * halfway cannot leave the phone ringing for a signed-out account.
+ */
+export type LogoutPayload = { refresh_token: string; device_token?: string };
 
 /** Same payload for OTP login, password login and refresh. */
 export type SessionPayload = {
@@ -116,15 +125,47 @@ export type WhatsAppNumber = {
 };
 
 /**
- * Mobile uses user, roles, permissions, numbers and `settings.tenant.id` (live
- * channel names are `tenant.<id>.number.<number>`, and the web app reads the id
- * from exactly here).
+ * AUTH-05 addition (2026-09-18): the server now hands the app everything it
+ * needs to open a socket. Before this, the key was bundled into the build (read
+ * off the web login page's `reverb-key` meta tag) and the tenant id was decoded
+ * out of the JWT to compose channel names by hand. Both are obsolete: read the
+ * connection from here and use `channels.agent` verbatim.
+ *
+ * `null` means Reverb is not configured for this deployment - fall back to
+ * re-fetching on foreground rather than guessing a connection.
+ */
+export type RealtimeChannels = {
+  /** LIVE-02: the ready-made per-person channel, e.g. `tenant.12.agent.34`. */
+  agent?: string | null;
+  /** The web app's per-number channels. Mobile does not need them. */
+  numbers?: string[] | null;
+  tenant?: string | null;
+  user?: string | null;
+};
+
+export type RealtimeConfig = {
+  /** PUBLIC app key. Never the Reverb secret. */
+  key: string;
+  host: string;
+  port: number;
+  scheme: string;
+  /** `/api/v1/broadcasting/auth` on the same host. */
+  auth_path: string;
+  channels?: RealtimeChannels | null;
+  events?: { agent?: string[] | null; tenant?: string[] | null } | null;
+};
+
+/**
+ * Mobile uses user, roles, permissions, numbers and `realtime`. `settings.tenant.id`
+ * is still read as a fallback for a server that predates the 2026-09-18 block.
  */
 export type BootstrapPayload = {
   user: AuthUser;
   roles: RoleName[];
   permissions: string[];
   numbers: WhatsAppNumber[];
+  /** AUTH-05 addition. Null or absent when Reverb is not configured. */
+  realtime?: RealtimeConfig | null;
   routes?: unknown;
   menus?: unknown;
   feature_flags?: unknown;
@@ -142,6 +183,50 @@ export type RegisterDevicePayload = {
 
 /** DELETE /me/devices — the token to forget. */
 export type UnregisterDevicePayload = { token: string };
+
+/**
+ * AUTH-11. PATCH /me/preferences. Both fields optional.
+ *
+ * `mute_notifications` is a SERVER-side check: it stops every push to this
+ * person on every phone (see PUSH-01), and is the same switch as the web app's
+ * bell mute. It is not a local-only toggle.
+ */
+export type UpdatePreferencesPayload = {
+  mute_notifications?: boolean;
+  mute_sound?: boolean;
+};
+
+/**
+ * CHAT-20. A saved reply the composer can insert. `scope` is "team" (shared,
+ * may contain `{{contact.name}}`-style variables the web fills client-side) or
+ * "personal". Read-only in phase 1: no create/edit/delete screens.
+ */
+export type CannedMessage = {
+  id: number;
+  scope: 'team' | 'personal';
+  owner_user_id?: number | null;
+  title: string;
+  shortcut?: string | null;
+  body: string;
+  created_by?: string | number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+/** CHAT-21. An internal note on a contact. Never sent to the customer. */
+export type ContactNote = {
+  id: number;
+  body: string;
+  author?: string | null;
+  author_id?: number | null;
+  created_at?: string | null;
+};
+
+/** CHAT-22. `body` max 2000 characters (ContactNote::MAX_LENGTH). */
+export type CreateContactNotePayload = { body: string };
+
+/** CHAT-22 server limit, enforced client-side so the composer can show a counter. */
+export const CONTACT_NOTE_MAX_LENGTH = 2000;
 
 /** Permission keys referenced by the workbook. */
 export const Permissions = {
