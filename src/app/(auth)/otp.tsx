@@ -148,10 +148,18 @@ export default function OtpScreen() {
             </AppText>
           </View>
 
-          {/* Offline is reported once by the global strip in `Screen`. */}
-          {challenge.notice || info || error ? (
+          {/*
+            Offline is reported once by the global strip in `Screen`.
+
+            `challenge.notice` is deliberately NOT rendered. It is server text
+            (AUTH-01 `data.notice`), and for accounts the backend flags as review
+            test accounts it reads "This is a review test account…", which is
+            store-reviewer instruction rather than anything a real person should
+            see. The field is still parsed and kept in `auth.otpChallenge`, so
+            restoring it is a one-line change if a notice worth showing appears.
+          */}
+          {info || error ? (
             <View style={styles.banners}>
-              {challenge.notice ? <Banner tone="info" title={challenge.notice} /> : null}
               {info && !error ? (
                 <Banner tone="success" icon="checkmark-circle-outline" title={info} />
               ) : null}

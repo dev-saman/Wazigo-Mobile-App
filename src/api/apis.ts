@@ -219,4 +219,4 @@ export const stopChatbot = (conversationId: Id) =>
  * decides here whether this user may listen on a channel.
  */
 export const authorizeBroadcastChannel = (payload: BroadcastAuthPayload) =>
-  network.post<BroadcastAuthResponse>(API.broadcasting.auth, payload, { envelope: false, readOnlySafe: true });
+  network.post<BroadcastAuthResponse>(API.broadcasting.auth, payload, { envelope: false });

@@ -20,7 +20,6 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 let mockBaseUrl = '';
-let mockReadOnly = false;
 jest.mock('@/constants/config', () => ({
   get Config() {
     return {
@@ -29,7 +28,6 @@ jest.mock('@/constants/config', () => ({
       requestTimeoutMs: 2000,
       uploadTimeoutMs: 2000,
       enableNetworkLogging: false,
-      readOnly: mockReadOnly,
     };
   },
 }));
@@ -82,7 +80,6 @@ function load() {
 beforeEach(() => {
   hits.length = 0;
   mockSecureStore.clear();
-  mockReadOnly = false;
 });
 
 describe('network.ts', () => {
@@ -243,37 +240,29 @@ describe('network.ts', () => {
     expect(hits).toHaveLength(1);
   });
 
-  it('in read-only mode, refuses every write before it leaves the device', async () => {
+  /**
+   * Writes are not gated - they go straight out. What remains is the trace, so
+   * an unexplained production send can still be tied to the tap that caused it.
+   */
+  it('traces every write with a timestamp and the stack it came from', async () => {
     const { tokenStorage, api } = load();
     await tokenStorage.save('access-1', 'refresh-1', 3600);
-    mockReadOnly = true;
     handler = (_req, _body, res) => ok(res, {});
     const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    // The exact request that reached production on 2026-09-16.
-    await expect(api.sendTextMessage(3, { text: 'hi' })).rejects.toMatchObject({ code: 'READ_ONLY' });
-    await expect(api.retryMessage(3, 99)).rejects.toMatchObject({ code: 'READ_ONLY' });
-    await expect(api.updatePresence({ status: 'online' })).rejects.toMatchObject({ code: 'READ_ONLY' });
-    await expect(api.resolveConversation(3)).rejects.toMatchObject({ code: 'READ_ONLY' });
-    await expect(api.updateConversationPriority(3, { priority: 'high' })).rejects.toMatchObject({
-      code: 'READ_ONLY',
-    });
-    expect(hits).toHaveLength(0);
+    await expect(api.sendTextMessage(3, { text: 'hi' })).resolves.toMatchObject({ httpStatus: 200 });
+    expect(hits.map((hit) => `${hit.method} ${hit.path}`)).toEqual(['POST /api/v1/conversations/3/messages']);
 
-    // Every refused write is traced with a timestamp and where it came from.
     const traced = log.mock.calls.map((call) => String(call[0]));
-    expect(traced.some((line) => /^\[api:write\] \S+Z POST \/conversations\/3\/messages BLOCKED$/.test(line))).toBe(
-      true,
-    );
+    expect(traced.some((line) => /^\[api:write\] \S+Z POST \/conversations\/3\/messages$/.test(line))).toBe(true);
     expect(traced.some((line) => line.startsWith('[api:write] issued from:'))).toBe(true);
     log.mockRestore();
   });
 
-  it('in read-only mode, still reads and still refreshes the session', async () => {
+  it('refreshes an almost-expired session before the read that needed it', async () => {
     const { tokenStorage, api } = load();
     // expires_in=1s is inside the 30s skew window, so the read refreshes first.
     await tokenStorage.save('expired-access', 'refresh-1', 1);
-    mockReadOnly = true;
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     handler = (req, _body, res) =>
       req.url === '/api/v1/auth/refresh'
@@ -288,10 +277,9 @@ describe('network.ts', () => {
     jest.mocked(console.log).mockRestore();
   });
 
-  it('in read-only mode, still authorizes socket channels but refuses to register a push device', async () => {
+  it('authorizes socket channels outside the response envelope', async () => {
     const { tokenStorage, api } = load();
     await tokenStorage.save('access-1', 'refresh-1', 3600);
-    mockReadOnly = true;
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     // Pusher auth is not wrapped in the envelope.
     handler = (_req, _body, res) => json(res, 200, { auth: 'key:signature' });
@@ -299,9 +287,6 @@ describe('network.ts', () => {
     await expect(api.authorizeBroadcastChannel({ socket_id: '1.2', channel_name: 'private-App.Models.User.5' })).resolves.toMatchObject({
       data: { auth: 'key:signature' },
     });
-    await expect(
-      api.registerPushDevice({ token: 't', platform: 'android', provider: 'expo', device_name: 'Wazigo Android' }),
-    ).rejects.toMatchObject({ code: 'READ_ONLY' });
 
     expect(hits.map((hit) => `${hit.method} ${hit.path}`)).toEqual(['POST /api/v1/broadcasting/auth']);
     expect(hits[0].auth).toBe('Bearer access-1');

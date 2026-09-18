@@ -62,6 +62,9 @@ export default function LoginScreen() {
   const mode = useWatch({ control, name: 'mode' });
   const busy = formState.isSubmitting;
 
+  // Unused while the password entry point is commented out at the bottom of the
+  // form. Kept, not deleted, so restoring AUTH-03 is a one-block change.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const switchMode = (next: LoginFormValues['mode']) => {
     setFormError(null);
     setValue('mode', next);
@@ -211,6 +214,15 @@ export default function LoginScreen() {
             </AppText>
           ) : null}
 
+          {/*
+            Password sign-in is hidden for now: WhatsApp OTP is the only way in.
+
+            Only the entry point is commented out. AUTH-03 is still wired end to
+            end - the password field above, `switchMode`, `signInWithPassword`
+            and the copy all remain - so restoring it is a matter of putting this
+            block back. Without it `mode` can never become 'password', which is
+            what makes the field above unreachable rather than dead.
+
           <View style={styles.divider}>
             <View style={styles.rule} />
             <AppText variant="caption" color="textMuted">
@@ -226,6 +238,7 @@ export default function LoginScreen() {
             disabled={busy}
             onPress={() => switchMode(mode === 'password' ? 'otp' : 'password')}
           />
+          */}
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

@@ -37,8 +37,6 @@ declare module 'axios' {
     /** Do not attempt refresh on 401 (e.g. logout). */
     skipAuthRefresh?: boolean;
     _isRefresh?: boolean;
-    /** A POST that changes nobody's data (socket channel auth): allowed in read-only builds. */
-    _readOnlySafe?: boolean;
     _retried?: boolean;
     _tokenUsed?: string;
     _startedAt?: number;
@@ -56,12 +54,6 @@ export type RequestOptions = {
   envelope?: boolean;
   timeout?: number;
   signal?: AbortSignal;
-  /**
-   * The call is a POST only in form: it authorizes, and changes no customer or
-   * account data (socket channel auth). Development builds that are read-only
-   * against production still allow it.
-   */
-  readOnlySafe?: boolean;
 };
 
 export type UploadOptions = RequestOptions & {
@@ -96,7 +88,6 @@ const ERROR_CODES = new Set<ApiErrorCode>([
   'OFFLINE',
   'NETWORK',
   'CANCELLED',
-  'READ_ONLY',
   'UNKNOWN',
 ]);
 
@@ -159,7 +150,6 @@ export const DEFAULT_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   OFFLINE: "You're offline. Check your internet connection and try again.",
   NETWORK: 'Unable to reach Wazigo. Check your connection and try again.',
   CANCELLED: 'Request cancelled.',
-  READ_ONLY: 'Not sent: this development build is read-only against production.',
   UNKNOWN: 'Something went wrong. Please try again.',
 };
 
@@ -319,13 +309,15 @@ async function getValidAccessToken(): Promise<string | null> {
 
 /**
  * Every write a development build attempts is logged with a wall-clock time and
- * the stack it was issued from, whether it is allowed or not. Timestamps line up
- * with `adb logcat`, so a write can be tied to what was happening on the device.
+ * the stack it was issued from. Timestamps line up with `adb logcat`, so a write
+ * can be tied to what was happening on the device - which is how an unexplained
+ * send gets traced back to the tap that caused it. Logging only; nothing here
+ * stops a request.
  */
-const traceWrite = (config: AxiosRequestConfig, outcome: 'allowed' | 'BLOCKED') => {
+const traceWrite = (config: AxiosRequestConfig) => {
   if (!__DEV__) return;
   const method = (config.method ?? 'get').toUpperCase();
-  console.log(`[api:write] ${new Date().toISOString()} ${method} ${stripQuery(config.url)} ${outcome}`);
+  console.log(`[api:write] ${new Date().toISOString()} ${method} ${stripQuery(config.url)}`);
   if (config._callerStack) console.log(`[api:write] issued from:
 ${config._callerStack}`);
 };
@@ -334,14 +326,7 @@ client.interceptors.request.use(async (config) => {
   config._startedAt = Date.now();
 
   const isWrite = (config.method ?? 'get').toLowerCase() !== 'get';
-  if (isWrite) {
-    // Refresh is session maintenance, not a change to anyone's data; without
-    // it a read-only build could not even restore its session. Channel auth is
-    // the same kind of call: it only asks whether this user may listen.
-    const blocked = Config.readOnly && !config._isRefresh && !config._readOnlySafe;
-    traceWrite(config, blocked ? 'BLOCKED' : 'allowed');
-    if (blocked) throw makeError('READ_ONLY', DEFAULT_ERROR_MESSAGES.READ_ONLY);
-  }
+  if (isWrite) traceWrite(config);
 
   if (isOnline === false) {
     throw makeError('OFFLINE', DEFAULT_ERROR_MESSAGES.OFFLINE, { isOffline: true, isNetworkError: true });
@@ -425,7 +410,6 @@ async function send<T, M>(
   data: unknown,
   {
     envelope = true,
-    readOnlySafe,
     ...options
   }: RequestOptions & { onUploadProgress?: (e: AxiosProgressEvent) => void } = {},
 ): Promise<ApiResponse<T, M>> {
@@ -437,7 +421,6 @@ async function send<T, M>(
       url,
       data,
       ...options,
-      _readOnlySafe: readOnlySafe,
       _callerStack,
     });
     return unwrap<T, M>(response, envelope);

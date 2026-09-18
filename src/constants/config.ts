@@ -19,20 +19,6 @@ const apiBaseUrl = trimTrailingSlash(
   process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL,
 );
 
-/** Real customers and real WhatsApp messages live behind this host. */
-const isProductionApi = /^https:\/\/app\.wazigo\.io(\/|$)/.test(apiBaseUrl);
-
-/**
- * Development builds must not change production data by accident: a real
- * WhatsApp message was sent from an emulator on 2026-09-16 during what was
- * meant to be read-only inspection. So in development, pointed at production,
- * every write is refused unless `EXPO_PUBLIC_READ_ONLY=0` says otherwise.
- * `EXPO_PUBLIC_READ_ONLY=1` forces it against any API. Release builds are never
- * read-only.
- */
-const readOnlyFlag = process.env.EXPO_PUBLIC_READ_ONLY;
-const readOnly = __DEV__ && (readOnlyFlag === '1' || (readOnlyFlag !== '0' && isProductionApi));
-
 export const Config = {
   apiBaseUrl,
   /** Origin without the /api/v1 prefix, used for /broadcasting/auth and relative media URLs. */
@@ -65,8 +51,6 @@ export const Config = {
    * and never in a release build.
    */
   networkDebug: __DEV__ && process.env.EXPO_PUBLIC_NETWORK_DEBUG === '1',
-  /** See `readOnly` above: development builds against production write nothing. */
-  readOnly,
   /**
    * EAS project id for Expo push tokens. `eas init` writes it to app.json
    * (`extra.eas.projectId`), which is read first; this is the fallback.

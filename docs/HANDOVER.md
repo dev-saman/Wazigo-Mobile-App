@@ -319,7 +319,7 @@ server sends personal events; fixing blocker 5 needs no app change beyond the ch
 
 - `src/services/socket/` - `channels.ts` (names, event → signal, pure and tested) and
   `socketClient.ts` (the only `pusher-js` importer; channel auth through `network`, so bearer +
-  refresh rules apply; read-only builds still allow the auth POST, it changes no data).
+  refresh rules apply).
 - `src/features/realtime/` - `realtimeSlice` (socket state, the open thread), `liveSignalBus`
   (socket and foreground pushes both feed it), `liveBatch` (750 ms batching), `applyLiveBatch`
   (reloads only what is on screen, respecting permissions), `useRealtime` (connect while
@@ -422,20 +422,24 @@ regenerated. Expo Go is no longer the way to run it: its white loading screen, i
 Native host and its lack of push all go away in the development build.
 
 **Local `.env` (gitignored, not in the repo)** currently holds:
-- `EXPO_PUBLIC_READ_ONLY=0` - switches the read-only guard off (below).
 - `EXPO_PUBLIC_NETWORK_DEBUG=1` - prints query, request body and response body for every call in
   the Metro terminal. Tokens, passwords, login codes and `Authorization` are redacted; customer
   message content is not. Off unless set; never in release builds (`src/api/debugLog.ts`).
 
-**Read-only guard (`7ee56b4`) - still in the code, switched off locally.** In development builds
-pointed at `https://app.wazigo.io`, every non-GET request except `/auth/refresh` is refused with
-`READ_ONLY` unless `EXPO_PUBLIC_READ_ONLY=0`. It also logs `[api:write]` (every write attempt,
-allowed or blocked, with a timestamp and call stack) and `[ui:write]` (the user action that started
-it: composer send, attachment, retry, template send, conversation actions). The user decided they
-do **not** want a read-only mode; removing it from code was blocked by the Claude Code permission
-classifier twice, so it was left for the user. To remove it: `git show 7ee56b4 --format=
---output=remove-guard.patch`, then `git apply -R remove-guard.patch`, then delete the patch file.
-Anyone who clones without that `.env` line gets writes blocked against production.
+**Read-only guard - REMOVED (2026-09-18).** The guard added in `7ee56b4` is gone from the code,
+along with the `READ_ONLY` error code and `EXPO_PUBLIC_READ_ONLY`. The user asked for it twice and
+did not want a read-only mode in the app. **There is now nothing between a tap and production:**
+every write goes straight out, in development as in release.
+
+What survives is diagnosis, not prevention - two development-only logs that made the accidental
+send traceable in the first place:
+- `[api:write]` (`src/api/network.ts`) - every non-GET request, with a timestamp and the call stack
+  it was issued from.
+- `[ui:write]` (`src/utils/devTrace.ts`) - the user action that started it: composer send,
+  attachment, retry, template send, conversation actions, contact note.
+
+Both line up with `adb logcat` timestamps, so a write can still be tied back to the tap that caused
+it. Neither blocks anything.
 
 **Why the guard exists - the accidental send (unresolved).** On 2026-09-16 at 14:48:50 IST a text
 "hi" was sent to +91 90045 83919 (conversation 3, an internal test contact) from the emulator
@@ -542,7 +546,7 @@ does not appear there) with the `[ui:write]` / `[api:write]` logs.
    init` + uploading both keys to EAS (user), the exact `POST /me/devices` body (unverified), and
    the server's sends (Expo push API, `data.conversation_id`, only to the assignee).
 9. **Template fallback** — show `delivery_pricing.category` next to "Template message", or not.
-10. **The read-only guard** — the user wants it removed from the code (§3, last section).
+10. ~~**The read-only guard**~~ — removed 2026-09-18, along with `EXPO_PUBLIC_READ_ONLY`.
 
 ## 6. Backend blockers (none fixed — see plan for detail)
 
@@ -558,9 +562,7 @@ the phone until the server sends personal events.
 
 Pick up from here, in roughly this order:
 
-1. **Remove the read-only guard from the code** if the user still wants that (question 10). The
-   exact commands are in §3, last section. Then delete `EXPO_PUBLIC_READ_ONLY=0` from `.env`.
-2. **Image upload 500s** (§3, "Seen while testing"): get the server log for those requests; confirm
+1. **Image upload 500s** (§3, "Seen while testing"): get the server log for those requests; confirm
    the app's multipart request with `EXPO_PUBLIC_NETWORK_DEBUG=1` or the DevTools Network tab on
    the development build.
 3. **Retry wording after a server error**: warn about possible duplicates whenever the server
@@ -589,6 +591,6 @@ adb logcat -v time | grep ReactNativeJS   # app logs incl. [api], [api:write], [
 ```
 
 `.env` is gitignored; copy `.env.example`. Only `EXPO_PUBLIC_*` values (they ship inside the app -
-never secrets). Without `.env` the app uses the production API. Development-only switches:
-`EXPO_PUBLIC_READ_ONLY` (0 = allow writes against production) and `EXPO_PUBLIC_NETWORK_DEBUG`
-(1 = print request and response bodies). Restart Metro with `-c` after changing `.env`.
+never secrets). Without `.env` the app uses the production API. Development-only switch:
+`EXPO_PUBLIC_NETWORK_DEBUG` (1 = print request and response bodies). Restart Metro with `-c` after
+changing `.env`.
