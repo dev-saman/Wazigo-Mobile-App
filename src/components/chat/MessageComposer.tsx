@@ -17,6 +17,8 @@ export type MessageComposerProps = {
   onChangeText: (value: string) => void;
   onSend: () => void;
   onAttach: () => void;
+  /** CHAT-20. Omitted when the picker is unavailable, and then no button shows. */
+  onQuickReply?: () => void;
   /** Blocks send while a message is still going out, or while offline. */
   disabled?: boolean;
   sending?: boolean;
@@ -33,6 +35,7 @@ export function MessageComposer({
   onChangeText,
   onSend,
   onAttach,
+  onQuickReply,
   disabled = false,
   sending = false,
   placeholder = 'Type a message',
@@ -66,6 +69,16 @@ export function MessageComposer({
           onPress={onAttach}
           disabled={disabled || sending}
         />
+
+        {onQuickReply ? (
+          <IconButton
+            icon="flash-outline"
+            accessibilityLabel="Quick replies"
+            color="textSecondary"
+            onPress={onQuickReply}
+            disabled={disabled || sending}
+          />
+        ) : null}
 
         <TextInput
           value={value}

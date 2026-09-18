@@ -2,7 +2,10 @@ import { combineReducers, type UnknownAction } from '@reduxjs/toolkit';
 
 import { authReducer } from '@/features/auth/authSlice';
 import { bootstrapReducer } from '@/features/bootstrap/bootstrapSlice';
+import { cannedMessagesReducer } from '@/features/cannedMessages/cannedMessagesSlice';
+import { composerReducer } from '@/features/composer/composerSlice';
 import { connectivityReducer } from '@/features/connectivity/connectivitySlice';
+import { contactNotesReducer } from '@/features/contactNotes/contactNotesSlice';
 import { conversationsReducer } from '@/features/conversations/conversationsSlice';
 import { labelsReducer } from '@/features/conversations/labelsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
@@ -16,7 +19,10 @@ import { appReset } from './actions';
 const combined = combineReducers({
   auth: authReducer,
   bootstrap: bootstrapReducer,
+  cannedMessages: cannedMessagesReducer,
+  composer: composerReducer,
   connectivity: connectivityReducer,
+  contactNotes: contactNotesReducer,
   conversations: conversationsReducer,
   dashboard: dashboardReducer,
   labels: labelsReducer,

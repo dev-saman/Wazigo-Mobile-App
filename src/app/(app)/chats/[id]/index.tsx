@@ -53,6 +53,7 @@ import {
   sendText,
   type ThreadRow,
 } from '@/features/messages';
+import { draftChanged, draftCleared, selectDraft } from '@/features/composer';
 import { useActiveConversation, useLiveRefresh } from '@/features/realtime';
 import {
   conversationRevocationHandled,
@@ -101,7 +102,13 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const labels = useAppSelector(selectLabels);
   const labelsStatus = useAppSelector(selectLabelsStatus);
 
-  const [draft, setDraft] = useState('');
+  // In the store, not local state: the quick-replies picker is a separate route
+  // and writes into the draft while this screen is unmounted. See composerSlice.
+  const draft = useAppSelector(selectDraft(conversationId));
+  const setDraft = useCallback(
+    (text: string) => dispatch(draftChanged({ conversationId, text })),
+    [conversationId, dispatch],
+  );
   const [attaching, setAttaching] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
@@ -180,7 +187,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
     const text = draft.trim();
     if (!text) return;
     traceWriteIntent('composer send pressed', { conversationId, length: text.length });
-    setDraft('');
+    dispatch(draftCleared(conversationId));
     void dispatch(sendText({ conversationId, text }));
   }, [conversationId, dispatch, draft]);
 
@@ -207,7 +214,7 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
 
         const caption = draft.trim();
         traceWriteIntent('attachment send', { conversationId, type: result.type, captionLength: caption.length });
-        setDraft('');
+        dispatch(draftCleared(conversationId));
         void dispatch(sendMedia({ conversationId, type: result.type, file: result.file, caption }));
       } finally {
         setAttaching(false);
@@ -349,6 +356,9 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
               onChangeText={setDraft}
               onSend={onSend}
               onAttach={() => setSheetOpen(true)}
+              onQuickReply={() =>
+                router.push({ pathname: '/chats/[id]/quick-replies', params: { id: conversationId } })
+              }
               disabled={offline}
               sending={attaching}
               placeholder={offline ? Copy.offlineComposer : undefined}
@@ -381,6 +391,14 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         onResolve={() => void runAction('resolve', () => dispatch(resolveConversation({ conversationId })).unwrap())}
         onReopen={() => void runAction('reopen', () => dispatch(reopenConversation({ conversationId })).unwrap())}
         onTakeOver={() => void runAction('take over', () => dispatch(stopChatbot({ conversationId })).unwrap())}
+        onNotes={
+          typeof thread?.contact?.id === 'number'
+            ? () => {
+                setOpenSheet('none');
+                router.push({ pathname: '/chats/[id]/notes', params: { id: conversationId } });
+              }
+            : undefined
+        }
         onPriority={() => setOpenSheet('priority')}
         onLabels={() => {
           if (labelsStatus === 'idle' || labelsStatus === 'failed') void dispatch(loadLabels());

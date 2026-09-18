@@ -23,6 +23,8 @@ const Copy = {
   takeOver: 'Take over from the chatbot',
   takeOverHint: 'Stops the automated replies in this conversation.',
   labelsNone: 'None',
+  notes: 'Notes',
+  notesHint: 'Internal notes on this contact. The customer never sees them.',
 };
 
 export type ConversationActionsSheetProps = {
@@ -34,6 +36,8 @@ export type ConversationActionsSheetProps = {
   onPriority: () => void;
   onLabels: () => void;
   onTakeOver: () => void;
+  /** CHAT-21/22. Omitted when the conversation carries no contact id. */
+  onNotes?: () => void;
   /** `conversations.tag`; priority and labels are hidden without it. */
   canTag: boolean;
   busy?: boolean;
@@ -54,6 +58,7 @@ export function ConversationActionsSheet({
   onPriority,
   onLabels,
   onTakeOver,
+  onNotes,
   canTag,
   busy = false,
   offline = false,
@@ -127,6 +132,15 @@ export function ConversationActionsSheet({
             onPress={onLabels}
           />
         </>
+      ) : null}
+
+      {onNotes ? (
+        <SheetAction
+          icon="document-text-outline"
+          label={Copy.notes}
+          description={Copy.notesHint}
+          onPress={onNotes}
+        />
       ) : null}
 
       {conversation?.assigned_user?.name ? (
