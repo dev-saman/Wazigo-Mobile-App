@@ -23,6 +23,7 @@ jest.mock('@/api/apis', () => ({
 }));
 
 import * as api from '@/api/apis';
+import { NO_SUPPORT } from '@/api/support';
 import { Permissions, type Conversation, type Message } from '@/api/types';
 import { signedIn } from '@/features/auth/authSlice';
 import { bootstrapLoaded } from '@/features/bootstrap/bootstrapSlice';
@@ -43,7 +44,16 @@ const message = (id: number): Message =>
 
 const signIn = (permissions: string[] = [Permissions.conversationsView, Permissions.dashboardView]) => {
   store.dispatch(signedIn({ id: 5, name: 'Asha' }));
-  store.dispatch(bootstrapLoaded({ permissions, roles: ['agent'], numbers: [], tenantId: 3, realtime: null }));
+  store.dispatch(
+    bootstrapLoaded({
+      permissions,
+      roles: ['agent'],
+      numbers: [],
+      tenantId: 3,
+      realtime: null,
+      support: NO_SUPPORT,
+    }),
+  );
 };
 
 beforeEach(() => {

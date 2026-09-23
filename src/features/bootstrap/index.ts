@@ -11,6 +11,7 @@ export {
   selectPermissions,
   selectPrimaryNumber,
   selectRoles,
+  selectSupport,
 } from './bootstrapSelectors';
 export { loadBootstrap } from './bootstrapThunks';
 export { useAnyPermission, usePermission } from './usePermission';

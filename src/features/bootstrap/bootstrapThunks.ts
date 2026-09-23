@@ -2,6 +2,7 @@ import * as api from '@/api/apis';
 import { normalizeError } from '@/api/network';
 import type { BootstrapPayload, RealtimeConfig, RoleName, WhatsAppNumber } from '@/api/types';
 import { userUpdated } from '@/features/auth/authSlice';
+import { toSupportContact } from '@/api/support';
 import { createAppAsyncThunk } from '@/store/hooks';
 
 import { bootstrapFailed, bootstrapLoaded, bootstrapLoading, type BootstrapData } from './bootstrapSlice';
@@ -68,6 +69,8 @@ const select = (payload: BootstrapPayload | undefined): BootstrapData => ({
   numbers: toNumbers(payload?.numbers),
   tenantId: toId(payload?.settings?.tenant?.id),
   realtime: toRealtime(payload?.realtime),
+  // Phase 4 is not published yet: an absent block reads as "nothing is set".
+  support: toSupportContact(payload?.support),
 });
 
 /**

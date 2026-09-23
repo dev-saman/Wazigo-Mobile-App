@@ -53,6 +53,12 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
     }
   }, [authStatus, dispatch, error?.code, status]);
 
+  // Phase 4: a 403 that closes the whole business is already being handled -
+  // the session is being cleared and the suspended screen put up. Showing
+  // "Access Denied" for the frame or two in between would be wrong and would
+  // flash. Wait it out on the splash instead.
+  if (error?.workspace) return <SplashView busy />;
+
   if (status === 'denied') {
     return (
       <AccessDeniedView

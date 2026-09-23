@@ -58,11 +58,53 @@ export type ApiError = {
   isNetworkError?: boolean;
   isOffline?: boolean;
   isTimeout?: boolean;
+  /**
+   * Super-admin Phase 4: a 403 whose body says the business itself is
+   * suspended or deactivated, rather than this user lacking a permission.
+   */
+  workspace?: WorkspaceUnavailable;
 };
 
 export type PageParams = {
   page?: number;
   per_page?: number;
+};
+
+// ---------------------------------------------------------------------------
+// Support contact (Super-admin Phase 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wazigo support runs on WhatsApp. The server hands the app a finished wa.me
+ * link with the customer's name, business and account number already written
+ * into the message and already encoded; the app only opens it. That is why the
+ * app never composes the link, never hard-codes a number, and never shows the
+ * support number as text - only the email is shown as a contact detail. Wazigo
+ * can then change the number or the wording from the back office without an app
+ * update.
+ *
+ * Phase 4 is not published yet, so both fields may be absent. Absent and null
+ * mean the same thing: nothing is set.
+ */
+export type SupportContact = {
+  email: string | null;
+  /** Complete and already encoded. Opened verbatim, never parsed or rebuilt. */
+  chat_url: string | null;
+};
+
+export type WorkspaceStatus = 'suspended' | 'deactivated';
+
+/**
+ * The `data` of a 403 when the business has been suspended or deactivated.
+ * Any signed-in call can answer with it, and so can sign-in itself.
+ */
+export type WorkspaceUnavailable = {
+  code: 'workspace_unavailable';
+  workspace_status: WorkspaceStatus;
+  /** Written for the customer by Wazigo. May be empty. */
+  reason: string | null;
+  /** Here the pre-typed message says the workspace is suspended. */
+  support: SupportContact;
 };
 
 // ---------------------------------------------------------------------------
@@ -165,6 +207,8 @@ export type BootstrapPayload = {
   numbers: WhatsAppNumber[];
   /** AUTH-05 addition. Null or absent when Reverb is not configured. */
   realtime?: RealtimeConfig | null;
+  /** Phase 4 addition. Absent until the support block is published. */
+  support?: SupportContact | null;
   routes?: unknown;
   menus?: unknown;
   feature_flags?: unknown;

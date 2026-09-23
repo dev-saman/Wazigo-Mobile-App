@@ -6,8 +6,10 @@ import type { UpdatePreferencesPayload } from '@/api/types';
 import { AppText, Card, IconButton, Screen } from '@/components/common';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { selectCurrentUser } from '@/features/auth/authSelectors';
+import { selectSupport } from '@/features/bootstrap';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import { updateNotificationPreferences } from '@/features/preferences';
+import { SupportCard } from '@/features/support';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { traceWriteIntent } from '@/utils/devTrace';
 
@@ -34,6 +36,9 @@ export default function SettingsScreen() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
   const offline = useAppSelector(selectIsOffline);
+  // Phase 4: re-read on every bootstrap, so a support number changed in the
+  // back office reaches the app without an app update.
+  const support = useAppSelector(selectSupport);
 
   const [saving, setSaving] = useState<keyof UpdatePreferencesPayload | null>(null);
   const [failed, setFailed] = useState(false);
@@ -127,6 +132,10 @@ export default function SettingsScreen() {
             {Copy.failed}
           </AppText>
         ) : null}
+
+        {/* Phase 4. Renders nothing at all until Wazigo has set a support
+            number or a support email. */}
+        <SupportCard support={support} />
 
         {user?.name ? (
           <>

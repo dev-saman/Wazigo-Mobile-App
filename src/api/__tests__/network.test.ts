@@ -227,6 +227,55 @@ describe('network.ts', () => {
     });
   });
 
+  it('announces a suspended workspace once, for a signed-in call and for sign-in alike', async () => {
+    const { tokenStorage, api, sessionEvents } = load();
+    await tokenStorage.save('access', 'refresh', 3600);
+    const blocked = jest.fn();
+    sessionEvents.on('workspaceUnavailable', blocked);
+
+    handler = (_req, _body, res) =>
+      json(res, 403, {
+        status: false,
+        message: 'Forbidden.',
+        data: {
+          code: 'workspace_unavailable',
+          workspace_status: 'suspended',
+          reason: 'Payment for August has not reached us.',
+          support: { email: 'support@wazigo.io', chat_url: 'https://wa.me/919999999999?text=Hi' },
+        },
+      });
+
+    await expect(api.getConversations()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      workspace: {
+        workspace_status: 'suspended',
+        reason: 'Payment for August has not reached us.',
+        support: { email: 'support@wazigo.io', chat_url: 'https://wa.me/919999999999?text=Hi' },
+      },
+    });
+    // Sign-in is a public call, and it has to report the closure just the same.
+    await expect(api.loginWithOtp({ phone: '+919999999999', code: '123456' })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    expect(blocked).toHaveBeenCalledTimes(2);
+    expect(blocked.mock.calls[0][0].workspace_status).toBe('suspended');
+    // A 403 is never retried, so the two calls are the only two requests made.
+    expect(hits).toHaveLength(2);
+  });
+
+  it('leaves an ordinary 403 as a plain permission refusal', async () => {
+    const { tokenStorage, api, sessionEvents } = load();
+    await tokenStorage.save('access', 'refresh', 3600);
+    const blocked = jest.fn();
+    sessionEvents.on('workspaceUnavailable', blocked);
+
+    handler = (_req, _body, res) => json(res, 403, { status: false, message: 'This action is unauthorized.' });
+
+    await expect(api.getConversations()).rejects.toMatchObject({ code: 'FORBIDDEN', workspace: undefined });
+    expect(blocked).not.toHaveBeenCalled();
+  });
+
   it('does not retry 403 and short-circuits requests while offline', async () => {
     const { tokenStorage, api, network } = load();
     await tokenStorage.save('access', 'refresh', 3600);

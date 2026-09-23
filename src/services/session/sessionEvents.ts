@@ -1,3 +1,5 @@
+import type { WorkspaceUnavailable } from '@/api/types';
+
 /**
  * Decouples the network layer from Redux / navigation. network.ts emits,
  * the app layer (store listeners) reacts.
@@ -8,6 +10,11 @@ export type SessionEventMap = {
   expired: { reason: 'refresh_failed' | 'no_refresh_token' };
   /** A refresh succeeded — carries the user returned by AUTH-04. */
   refreshed: { user: unknown };
+  /**
+   * Phase 4: a 403 saying the business is suspended or deactivated. Emitted for
+   * any call, including sign-in, and carries the reason and the support block.
+   */
+  workspaceUnavailable: WorkspaceUnavailable;
 };
 
 type Listener<K extends keyof SessionEventMap> = (payload: SessionEventMap[K]) => void;
@@ -15,6 +22,7 @@ type Listener<K extends keyof SessionEventMap> = (payload: SessionEventMap[K]) =
 const listeners: { [K in keyof SessionEventMap]: Set<Listener<K>> } = {
   expired: new Set(),
   refreshed: new Set(),
+  workspaceUnavailable: new Set(),
 };
 
 export const sessionEvents = {

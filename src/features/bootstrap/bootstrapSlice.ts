@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { ApiError, RealtimeConfig, RoleName, WhatsAppNumber } from '@/api/types';
+import type { ApiError, RealtimeConfig, RoleName, SupportContact, WhatsAppNumber } from '@/api/types';
+import { NO_SUPPORT } from '@/api/support';
 import { appReset } from '@/store/actions';
 
 export type BootstrapStatus =
@@ -26,6 +27,12 @@ export type BootstrapState = {
    * the deployment has no Reverb, in which case the app stays on REST polling.
    */
   realtime: RealtimeConfig | null;
+  /**
+   * Phase 4: the support email and the ready-made WhatsApp link. Re-read on
+   * every bootstrap, so a number or wording changed in the back office arrives
+   * without an app update.
+   */
+  support: SupportContact;
   /** Kept so the retry screen can explain what went wrong. */
   error: ApiError | null;
   loadedAt: number | null;
@@ -37,6 +44,7 @@ export type BootstrapData = {
   numbers: WhatsAppNumber[];
   tenantId: number | null;
   realtime: RealtimeConfig | null;
+  support: SupportContact;
 };
 
 const initialState: BootstrapState = {
@@ -46,6 +54,7 @@ const initialState: BootstrapState = {
   numbers: [],
   tenantId: null,
   realtime: null,
+  support: NO_SUPPORT,
   error: null,
   loadedAt: null,
 };
@@ -65,6 +74,7 @@ const bootstrapSlice = createSlice({
       state.numbers = action.payload.numbers;
       state.tenantId = action.payload.tenantId;
       state.realtime = action.payload.realtime;
+      state.support = action.payload.support;
       state.error = null;
       state.loadedAt = Date.now();
     },

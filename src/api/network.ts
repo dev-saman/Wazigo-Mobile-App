@@ -24,6 +24,7 @@ import { tokenStorage } from '@/services/storage/tokenStorage';
 
 import { describeBody, formatDebugValue, redact } from './debugLog';
 import { PUBLIC_PATHS, REFRESH_PATH } from './endpoints';
+import { readWorkspaceUnavailable } from './support';
 import type { ApiEnvelope, ApiError, ApiErrorCode, ApiResponse, SessionPayload, UploadFile } from './types';
 
 // ---------------------------------------------------------------------------
@@ -205,6 +206,8 @@ export function normalizeError(error: unknown): ApiError {
       status,
       errors,
       retryAfterSeconds: status === 429 ? parseRetryAfter(response.headers?.['retry-after']) : undefined,
+      // Phase 4: a 403 that closes the whole business rather than one action.
+      workspace: status === 403 ? readWorkspaceUnavailable(response.data) ?? undefined : undefined,
     });
   }
 
@@ -365,6 +368,15 @@ client.interceptors.response.use(
     const status = error.response?.status;
     log(config, status ?? error.code ?? 'ERR');
     logDetail(config, status ?? error.code ?? 'ERR', error.response?.data);
+
+    // A suspended or deactivated business answers 403 to every call, sign-in
+    // included. Announcing it here, once, means no screen has to recognise it:
+    // the store listener signs the user out and shows the full-screen message
+    // wherever they happen to be.
+    if (status === 403) {
+      const workspace = readWorkspaceUnavailable(error.response?.data);
+      if (workspace) sessionEvents.emit('workspaceUnavailable', workspace);
+    }
 
     const canRefresh =
       status === 401 && !!config && needsAuth(config) && !config._isRefresh && !config.skipAuthRefresh && !config._retried;

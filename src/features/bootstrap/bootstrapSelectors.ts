@@ -11,6 +11,12 @@ export const selectRoles = (state: RootState) => state.bootstrap.roles;
 export const selectNumbers = (state: RootState) => state.bootstrap.numbers;
 export const selectTenantId = (state: RootState) => state.bootstrap.tenantId;
 
+/**
+ * Phase 4. The support email and the server's finished WhatsApp link. The link
+ * is opened exactly as it arrives; the app never reads the number out of it.
+ */
+export const selectSupport = (state: RootState) => state.bootstrap.support;
+
 /** AUTH-05 addition: socket connection details, or null when Reverb is off. */
 export const selectRealtimeConfig = (state: RootState) => state.bootstrap.realtime;
 

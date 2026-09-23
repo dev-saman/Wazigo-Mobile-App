@@ -12,6 +12,7 @@ import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
 import { messagesReducer } from '@/features/messages/messagesSlice';
 import { realtimeReducer } from '@/features/realtime/realtimeSlice';
 import { templatesReducer } from '@/features/templates/templatesSlice';
+import { workspaceReducer } from '@/features/workspace/workspaceSlice';
 
 import { appReset } from './actions';
 
@@ -29,6 +30,7 @@ const combined = combineReducers({
   messages: messagesReducer,
   realtime: realtimeReducer,
   templates: templatesReducer,
+  workspace: workspaceReducer,
 });
 
 export type RootState = ReturnType<typeof combined>;
