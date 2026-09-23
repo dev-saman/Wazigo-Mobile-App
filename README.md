@@ -13,7 +13,9 @@ web dashboard.
 Every screen in phase 1 is built and the checks below pass. Three things are worth knowing before
 you judge anything by that:
 
-- **It has run on an Android emulator against the live API.** iOS has never been built or run.
+- **It has run on an Android emulator and on the iOS Simulator**, both against the live API. On
+  Android it is signed in with a real test account and has sent real messages; on iOS only the
+  login screen has been seen, since going further needs a test account.
 - **Four backend blockers are still open** — the ones that stand between "my chats" and "nearly
   my chats". Filtering on the device is never the fix. See §13 of the reference.
 - Image upload returns 500 from production, and media other than images cannot be opened.
@@ -28,14 +30,15 @@ cp .env.example .env
 npm start
 ```
 
-Then press `a` for Android or `i` for iOS (macOS). Without a `.env` the app talks to the
-production API.
+Then press `a` for Android or `i` for iOS (macOS). Both need a development build first
+(`npm run android` / `npm run ios`) — this is not an Expo Go app. Without a `.env` the app
+talks to the production API.
 
 | Script | What it does |
 | --- | --- |
 | `npm start` | Expo dev server (`-c` clears the cache) |
 | `npm run android` | Start and open on Android |
-| `npm run ios` | Start and open on iOS (macOS / Expo Go) |
+| `npm run ios` | Start and open on iOS (macOS). First build takes ~40 min — see the handover |
 | `npm run lint` | ESLint (`eslint-config-expo`) plus this project's import guards |
 | `npm run typecheck` | TypeScript for the app and for the tests |
 | `npm test` | Jest — 286 tests, 38 suites |
@@ -84,6 +87,12 @@ Rules the linter enforces, because each one has a reason:
 | `expo-file-system` only in `mediaCache.ts` | Media is fetched with the bearer token, never as a public URL |
 | `pusher-js` only in `services/socket/socketClient.ts` | Socket events become ids at one edge; no screen sees a payload |
 | `expo-notifications` only in `services/push/pushNotifications.ts` | One place owns permissions, tokens and the foreground rule |
+
+Two patches in `patches/` are applied on `postinstall` and **both are pinned to an exact version**:
+`expo-modules-core` (the Android NDK build) and `expo-modules-jsi` (without it, iOS does not compile
+under Xcode 26.2). Bumping `expo` can float either package and orphan its patch — re-roll them if
+you take the upgrades `expo-doctor` suggests. The reasoning is in
+[docs/HANDOVER.md](docs/HANDOVER.md) under "First iOS build".
 
 Two conventions that are easy to trip over:
 

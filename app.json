@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "io.wazigo.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "io.wazigo.app",
@@ -33,7 +36,12 @@
           "imageWidth": 88
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -46,7 +54,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Wazigo uses your photos so you can send them to customers on WhatsApp.",
-          "cameraPermission": "Wazigo uses the camera so you can send a photo to customers on WhatsApp."
+          "cameraPermission": "Wazigo uses the camera so you can send a photo to customers on WhatsApp.",
+          "microphonePermission": false
         }
       ]
     ],
