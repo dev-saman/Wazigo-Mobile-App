@@ -28,15 +28,17 @@ Laravel API; the app renders what the server allows and sends what the server ac
 | Tests | 286 passing across 38 suites |
 | Typecheck / lint | Clean |
 | Android device run | Done — development build on an emulator, against the live API |
-| iOS | **Never built or run.** Configured in `app.json` but unverified |
+| iOS | Builds and runs on the Simulator (iPhone 17 Pro, iOS 26.2), signed in against the live API (§4) |
 | Backend blockers | 3 of 6 fixed; 3 still open (§13) |
-| Support chat (Phase 4) | Built, partly verified (§11) |
+| Support chat (Phase 4) | Built, partly verified (§11); the Settings card renders on iOS and the mail fallback works |
 
 Three things are **not** true despite the code being complete:
 
-1. **iOS has never been built.** `ios.bundleIdentifier` is set and the code is cross-platform,
-   but no one has run `expo run:ios`, installed a pod, or tested APNs. Treat every iOS claim in
-   this document as "should work", not "does work".
+1. **iOS runs, but not everything on it is proven.** It builds, installs, signs in against the
+   live API, and the dashboard, chats, a thread and Settings all render (§4). Not proven: APNs
+   (a simulator gets no push token at all), release signing, and sending a message — every
+   conversation on the test account has a closed reply window, so the composer has only been
+   checked in isolation.
 2. **Media beyond images cannot be opened.** Documents, video and audio are named in the
    bubble but not playable — that needs a native dependency nobody has chosen (§12).
 3. **Image upload returns 500 from production.** Reproduced five times. The request matches the
@@ -91,22 +93,76 @@ adb exec-out screencap -p > shot.png        # screenshot
 adb -s emulator-5554 emu avd name           # the AVD name expo run:android --device wants
 ```
 
-### iOS (unverified)
+### iOS
 
-Needs macOS, Xcode, and CocoaPods. Expected to be `npx expo run:ios`. Nothing in the JavaScript
-is Android-only, but these are unproven and should be checked first:
+`npx expo run:ios`. Verified on an iPhone 17 Pro simulator (iOS 26.2) on an **Intel** Mac with
+Xcode 26.2 and CocoaPods 1.15.2: builds with 0 errors, installs, signs in against the live API,
+and renders the dashboard, chats list, a message thread and Settings. First build takes about
+40 minutes; later ones are far quicker.
 
-- **CocoaPods install** for the 14 native Expo modules in `package.json`.
-- **Signing** — an Apple developer team, and a provisioning profile for `io.wazigo.app`.
-- **APNs** — an APNs key uploaded to EAS. Push has only ever been exercised through FCM.
-- **`expo-secure-store`** uses the iOS Keychain rather than Android Keystore; the token flow
-  should be re-tested end to end, especially expiry and reinstall behaviour.
-- **`patches/expo-modules-core+57.0.18.patch`** is Android-only (a Gradle stub-PCH task that
-  broke on paths with spaces). It will not apply to or affect iOS, but confirm `patch-package`
-  still exits clean on a Mac.
-- **`plugins/with-release-signing.js`** is Android-only. iOS release signing is not configured.
-- `KeyboardAvoidingView` already branches on `Platform.OS === 'ios'` with `behavior="padding"`
-  in all five screens that need it — written but never seen.
+**Expo SDK 57 does not compile under Xcode 26.2 without a patch.** `xcodebuild` fails with
+error 65 in the `[CP-User] Build ExpoModulesJSI xcframework` phase, which compiles Expo's JSI
+Swift package under `-cxx-interoperability-mode=default -swift-version 6`. Swift 6.2.3 rejects
+two things Expo ships as-is: `SWIFT_RETURNS_RETAINED` on a constructor of an `import_reference`
+type (`RuntimeScheduler.h`), and three `nonisolated(unsafe)` locals captured by a global-actor
+closure (`JavaScriptRuntime.swift`). `expo-modules-core` pins `expo-modules-jsi@~57.1.0` and
+57.1.0 is the newest on that line — the 58.0.3 tarball carries the identical header — so
+`patches/expo-modules-jsi+57.1.0.patch` is the fix. Upstream:
+[expo/expo#50067](https://github.com/expo/expo/issues/50067),
+[#49740](https://github.com/expo/expo/pull/49740).
+
+> **Both patches are pinned to exact versions** — `expo-modules-core@57.0.18` (Android's NDK
+> build) and `expo-modules-jsi@57.1.0` (iOS compiling at all). Bumping `expo` can float either
+> package and orphan its patch. Re-roll them if you take the upgrades `expo-doctor` suggests.
+
+`app.json` declares export compliance (`ITSAppUsesNonExemptEncryption`) and suppresses two
+placeholder purpose strings for permissions the app never uses — Face ID (`expo-secure-store`
+never sets `requireAuthentication`) and the microphone (`launchCameraAsync` is images-only).
+The microphone one also drops `android.permission.RECORD_AUDIO`, which was an unused
+expo-image-picker default; that is the only Android-visible change.
+
+Four platform behaviours were wrong and are fixed:
+
+| Was | Now |
+| --- | --- |
+| `textAlignVertical: 'center'` — Android-only, so a one-line draft sat 2.75pt high in the composer | Padded to `(minTouch − lineHeight) / 2` on iOS; measured 0.08pt off centre, box still exactly 44.00pt |
+| Tab bar `64 + inset` = 98pt against iOS's native 83 | `Platform.select({ ios: 52, default: 64 })` → measured 86pt on the signed-in app; Android keeps its device-tuned value |
+| Sheets had no swipe-down — `onRequestClose` is only the Android back button | `PanResponder` + `Animated` on the grabber and title row, no new dependency |
+| `ellipsis-vertical` in `ThreadHeader`, an Android convention | `ellipsis-horizontal` on iOS |
+
+**A `PanResponder` inside a `Modal` on iOS must claim on touch-down.** `onMoveShouldSetPanResponder`
+is never called there — nor the capture variant — so `gestureState.dy` stays 0 and the ordinary
+"claim once the finger has moved 4pt" idiom silently does nothing. The identical responder mounted
+outside a `Modal` receives the whole stream, which is how this was found.
+`onStartShouldSetPanResponder: () => true` is the way around it; a child `Pressable` still wins its
+own taps. Note that a native `ScrollView` in the same `Modal` scrolls fine — UIKit handles that
+without the JS responder system, so it is **not** evidence that JS gestures are being delivered.
+
+Still unproven on iOS:
+
+- **APNs.** A simulator never issues a push token, and push is unconfigured until `eas init`
+  regardless (§10).
+- **Release signing.** `plugins/with-release-signing.js` is Android-only; the iOS equivalent
+  does not exist.
+- **Sending a message.** Every conversation on the test account has a closed 24-hour reply
+  window, so the composer has only been measured in isolation, never used to send.
+- **`expo-secure-store` across a reinstall.** It uses the iOS Keychain rather than the Android
+  Keystore; session restore works, but expiry and reinstall behaviour were not re-tested.
+
+Two traps worth knowing:
+
+- **`expo run:ios` points the dev client at your LAN IP** (e.g. `192.168.1.107:8081`), which the
+  simulator often cannot reach — it lands back on the home screen looking like a crash. Re-open
+  against loopback:
+  `xcrun simctl openurl booted "exp+wazigo-mobile-app://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"`.
+- **`Could not parse Expo config: android.googleServicesFile` on every Metro start** is harmless
+  noise. `google-services.json` is gitignored and Android-only; the dev server's manifest
+  middleware validates it even when serving iOS. `expo config` exits 0 without it and the iOS
+  build is unaffected.
+
+`ios/` is gitignored (CNG). `npx expo prebuild --platform ios` regenerates it and **clears
+`ios/Pods`**; the next `expo run:ios` reinstalls them (~150 s). The prebuilt RN frameworks all
+ship `ios-arm64_x86_64-simulator` slices, so an Intel Mac needs no source build of React Native.
 
 ### Environment
 
