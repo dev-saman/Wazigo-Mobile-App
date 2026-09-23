@@ -44,6 +44,10 @@ const suspended: WorkspaceUnavailable = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // `appReset` deliberately no longer clears this slice, so the screen cannot
+  // be taken down by the very reset that puts it up. Tests clear it the same
+  // way the customer does.
+  store.dispatch(workspaceCleared());
   store.dispatch(appReset());
   store.dispatch(signedIn({ id: 7, name: 'Riya' }));
 });

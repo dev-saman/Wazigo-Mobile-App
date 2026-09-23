@@ -2,7 +2,6 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { NO_SUPPORT } from '@/api/support';
 import type { SupportContact, WorkspaceStatus, WorkspaceUnavailable } from '@/api/types';
-import { appReset } from '@/store/actions';
 
 export type WorkspaceState = {
   /** Null while the business is in good standing - the normal app is reachable. */
@@ -31,11 +30,10 @@ const workspaceSlice = createSlice({
     /** The customer asked to try again, e.g. after Wazigo reactivated them. */
     workspaceCleared: () => initialState,
   },
-  extraReducers: (builder) => {
-    // A session reset is part of showing the screen, so the screen is set up
-    // after the reset, never before it - see `handleWorkspaceUnavailable`.
-    builder.addCase(appReset, () => initialState);
-  },
+  // Deliberately no `appReset` case: clearing the session is part of putting
+  // this screen up, so the screen cannot be something the reset takes down.
+  // `rootReducer` carries the slice across, and `workspaceCleared` is the only
+  // way out - see `handleWorkspaceUnavailable`.
 });
 
 export const { workspaceBlocked, workspaceCleared } = workspaceSlice.actions;

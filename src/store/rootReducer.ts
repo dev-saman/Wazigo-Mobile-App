@@ -38,7 +38,12 @@ export type RootState = ReturnType<typeof combined>;
 export const rootReducer = (state: RootState | undefined, action: UnknownAction): RootState => {
   if (appReset.match(action)) {
     // Device connectivity is not session data — keep it across resets.
-    return combined({ connectivity: state?.connectivity } as RootState, action);
+    // Neither is a suspended workspace: clearing the session is part of showing
+    // that screen, so the reset must not take it down again.
+    return combined(
+      { connectivity: state?.connectivity, workspace: state?.workspace } as RootState,
+      action,
+    );
   }
   return combined(state, action);
 };

@@ -268,6 +268,11 @@ async function performRefresh(): Promise<string> {
     const transient =
       apiError.isNetworkError || apiError.code === 'SERVER_ERROR' || apiError.code === 'RATE_LIMITED';
     if (transient) throw apiError;
+    // A suspended business revokes the refresh token and answers 403 here too.
+    // The interceptor has already announced the closure, which clears the
+    // session itself; reporting an expired session on top of it would only race
+    // the suspended screen and replace it with a less useful one.
+    if (apiError.workspace) throw apiError;
     throw await expireSession('refresh_failed');
   }
 
@@ -298,7 +303,7 @@ async function getValidAccessToken(): Promise<string | null> {
     try {
       return await refreshSession();
     } catch (error) {
-      if (isApiError(error) && error.code === 'SESSION_EXPIRED') throw error;
+      if (isApiError(error) && (error.code === 'SESSION_EXPIRED' || error.workspace)) throw error;
       // Transient refresh failure: try the existing token; a 401 retries refresh once.
       return tokens.accessToken;
     }

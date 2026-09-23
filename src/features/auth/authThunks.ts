@@ -162,12 +162,18 @@ export const signOut = createAppAsyncThunk<void, void>('auth/signOut', async (_,
   dispatch(appReset());
 });
 
-/** Triggered by network.ts when refresh fails. Ignored during an explicit sign-out. */
+/**
+ * Triggered by network.ts when refresh fails. Ignored during an explicit
+ * sign-out, and ignored when the business itself has been suspended: that 403
+ * kills the refresh token too, so both stories arrive from the one response and
+ * "Session expired" is the less useful of the two.
+ */
 export const handleSessionExpired = createAppAsyncThunk<void, void>(
   'auth/handleSessionExpired',
   async (_, { dispatch, getState }) => {
     const { status, sessionExpired } = getState().auth;
     if (status === 'signingOut' || sessionExpired) return;
+    if (getState().workspace.status) return;
     await clearLocalSession();
     dispatch(appReset());
     // Only show "Session Expired" to someone who was actually signed in.
