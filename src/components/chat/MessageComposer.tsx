@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { MessageLimits } from '@/api/types';
@@ -11,6 +11,15 @@ const COUNTER_FROM = MessageLimits.textMax - 200;
 
 /** About five lines; longer drafts scroll inside the box. */
 const MAX_INPUT_HEIGHT = 120;
+
+/**
+ * iOS draws a multiline TextInput from the top and ignores `textAlignVertical`,
+ * so a one-line draft sat high in the box. Pad it to the middle instead, which
+ * also makes the measured content height of one line come out at exactly
+ * `minTouch` - so the box neither grows nor jumps on the first keystroke.
+ */
+const MESSAGE_LINE_HEIGHT = Typography.message.lineHeight ?? 21;
+const IOS_INPUT_PADDING = (Layout.minTouch - MESSAGE_LINE_HEIGHT) / 2;
 
 export type MessageComposerProps = {
   value: string;
@@ -127,9 +136,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
-    textAlignVertical: 'center',
+    // Android centres the text itself; iOS needs the padding to do it (see above).
+    ...Platform.select({
+      ios: { paddingTop: IOS_INPUT_PADDING, paddingBottom: IOS_INPUT_PADDING },
+      default: { paddingTop: Spacing.sm, paddingBottom: Spacing.sm, textAlignVertical: 'center' as const },
+    }),
   },
   inputError: { borderColor: Colors.error },
   send: {

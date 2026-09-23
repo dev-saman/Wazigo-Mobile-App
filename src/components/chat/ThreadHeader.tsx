@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import type { Conversation } from '@/api/types';
 import { AppText, Avatar, Badge, IconButton } from '@/components/common';
@@ -42,7 +42,8 @@ export function ThreadHeader({ conversation, onBack, onActions }: ThreadHeaderPr
       {resolved ? <Badge label="Resolved" tone="soft" /> : null}
       {onActions ? (
         <IconButton
-          icon="ellipsis-vertical"
+          // The overflow affordance is horizontal on iOS, vertical on Android.
+          icon={Platform.OS === 'ios' ? 'ellipsis-horizontal' : 'ellipsis-vertical'}
           accessibilityLabel="Conversation actions"
           color="textSecondary"
           onPress={onActions}
