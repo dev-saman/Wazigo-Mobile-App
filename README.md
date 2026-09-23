@@ -10,14 +10,15 @@ web dashboard.
 
 ## Status
 
-Every screen in phase 1 is built and the checks below pass. Two things are worth knowing before
+Every screen in phase 1 is built and the checks below pass. Three things are worth knowing before
 you judge anything by that:
 
-- **Nothing has run on a device or an emulator, and no call has reached the real backend.** All
-  API behaviour was verified against a local mock server and unit tests.
-- **Six backend blockers are still open**, and four of them are what stand between "my chats" and
-  "nearly my chats". They are written up for the server team in
-  [docs/backend-blockers.md](docs/backend-blockers.md). Filtering on the device is never the fix.
+- **It has run on an Android emulator against the live API.** iOS has never been built or run.
+- **Four backend blockers are still open** — the ones that stand between "my chats" and "nearly
+  my chats". Filtering on the device is never the fix. See §13 of the reference.
+- Image upload returns 500 from production, and media other than images cannot be opened.
+
+[docs/REFERENCE.md](docs/REFERENCE.md) is the complete current picture.
 
 ## Quick start
 
@@ -37,7 +38,7 @@ production API.
 | `npm run ios` | Start and open on iOS (macOS / Expo Go) |
 | `npm run lint` | ESLint (`eslint-config-expo`) plus this project's import guards |
 | `npm run typecheck` | TypeScript for the app and for the tests |
-| `npm test` | Jest — 182 tests |
+| `npm test` | Jest — 286 tests, 38 suites |
 | `npm run doctor` | Expo Doctor |
 
 ## Environment
@@ -49,8 +50,7 @@ binary can read them. Never put an API secret, the Reverb secret or WhatsApp cre
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_BASE_URL` | `https://app.wazigo.io/api/v1` | API root. The origin without `/api/v1` is derived from it for media and broadcast auth |
 | `EXPO_PUBLIC_OTP_LENGTH` | `5` | Login code length. Must match the backend's OTP setting (no endpoint exposes it) |
-| `EXPO_PUBLIC_REVERB_APP_KEY` | production's public key | Public Reverb key (the web login page publishes it). Set it only for another server |
-| `EXPO_PUBLIC_REVERB_HOST` / `_PORT` / `_SCHEME` | `app.wazigo.io` / `443` / `https` | Reverb endpoint |
+| `EXPO_PUBLIC_NETWORK_DEBUG` | *(off)* | `1` prints request and response bodies. Development only; redacts credentials, not customer content |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | *(empty)* | Fallback for push tokens when `app.json` has no `extra.eas.projectId` (`eas init` writes that) |
 
 ## How it is put together
@@ -108,13 +108,13 @@ means access was taken away and is treated as such.
 
 ### Live updates
 
-The app connects to Reverb while it is open and online, on the user's personal channel
-(`private-App.Models.User.<id>`) and on `private-tenant.<tenant>.number.<number>` for each number
-in the bootstrap - the same channels and events as the web app.
+The app connects to Reverb while it is open and online, on **one** channel: the per-person
+`tenant.<id>.agent.<user>`, whose name and connection details both arrive in `/me/bootstrap`
+(`data.realtime`). Nothing is bundled into the build. The number channels the app used until
+2026-09-18 carried other agents' customers and their message text, and mobile must not join them.
 
-**Events are signals, never data.** Number channels still carry other agents' conversations
-(backend blocker 5), so `services/socket/channels.ts` reduces every event to a conversation id
-at the edge. A short burst is batched, and the screens reload through the normal server-scoped
+**Events are signals, never data.** `services/socket/channels.ts` reduces every event to a
+conversation id at the edge. A short burst is batched, and the screens reload through the normal server-scoped
 REST calls: the chats list, the dashboard, and the thread that is open. Those reloads are quiet
 and keep pages or history the user scrolled to.
 
@@ -149,6 +149,7 @@ real device, and a passing render test would only suggest otherwise.
 
 | Document | What is in it |
 | --- | --- |
-| [docs/HANDOVER.md](docs/HANDOVER.md) | Read first. Status, what exists, decisions and their reasons, what is next |
-| [docs/development-plan.md](docs/development-plan.md) | Endpoint map, stage-by-stage design notes, deviations from the design and why |
-| [docs/backend-blockers.md](docs/backend-blockers.md) | For the server team: what must change, and how to verify each fix |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | **Read this one.** The complete current reference: status, architecture, API contract, every feature, build and release, conventions, open questions |
+| [docs/HANDOVER.md](docs/HANDOVER.md) | Superseded. Stage-by-stage history and the first device run |
+| [docs/development-plan.md](docs/development-plan.md) | Superseded. Original plan and design notes |
+| [docs/backend-blockers.md](docs/backend-blockers.md) | Superseded by §13 of the reference. Detail on each blocker and how to verify a fix |

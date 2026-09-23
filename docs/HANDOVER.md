@@ -1,5 +1,8 @@
 # Wazigo Mobile App — Handover (after the first device run and design pass)
 
+> **Superseded by [REFERENCE.md](REFERENCE.md) (23 September 2026).** Kept for history;
+> parts of this file are out of date.
+
 Last updated: 2026-09-16. Read this first, then [development-plan.md](development-plan.md)
 (endpoint map, design deviations, backend blockers).
 

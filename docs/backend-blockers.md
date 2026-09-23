@@ -1,5 +1,8 @@
 # Wazigo Mobile — what the app needs from the backend
 
+> **Superseded by [REFERENCE.md](REFERENCE.md) (23 September 2026).** Kept for history;
+> parts of this file are out of date.
+
 For the Wazigo server team. Last updated: 2026-09-16, against the API Reference workbook
 (sheets: Start here, Login, Chat, Dashboard, Live updates) as reviewed on 2026-09-15.
 

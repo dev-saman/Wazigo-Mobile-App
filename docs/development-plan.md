@@ -1,5 +1,8 @@
 # Wazigo Mobile App — Development Plan
 
+> **Superseded by [REFERENCE.md](REFERENCE.md) (23 September 2026).** Kept for history;
+> parts of this file are out of date.
+
 Source of truth for API behaviour: **Wazigo Mobile App — API Reference** (Google Sheet,
 sheets: Start here, Login, Chat, Dashboard, Live updates; last reviewed 2026-09-15).
 
