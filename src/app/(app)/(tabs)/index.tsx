@@ -120,8 +120,13 @@ function ReportScreen() {
 
   return (
     <Screen edges={['top']} padded={false}>
+      <View style={styles.headerPadding}>
+        <DashboardHeader />
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -131,12 +136,9 @@ function ReportScreen() {
           />
         }
       >
-        <DashboardHeader />
         <GreetingCard name={user?.name} />
 
-        <View style={styles.stale}>
-          <StaleDataBanner error={error} title={Copy.refreshFailed} />
-        </View>
+        <StaleDataBanner error={error} title={Copy.refreshFailed} />
 
         {/* REP-10: an account can have the overview switched off. That is a
             setting, not a failure, so Today stands on its own instead. */}
@@ -251,26 +253,25 @@ export default function HomeRoute() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingBottom: Spacing.xl },
-  stale: { paddingHorizontal: Layout.screenPadding },
-  section: {
+  headerPadding: { paddingHorizontal: Layout.screenPadding },
+  content: {
     paddingHorizontal: Layout.screenPadding,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
+    paddingBottom: Spacing.xxxl,
+    gap: Spacing.lg,
+    maxWidth: Layout.maxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
   },
-  sectionHint: { paddingHorizontal: Layout.screenPadding, paddingBottom: Spacing.xs },
-  metrics: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    paddingHorizontal: Layout.screenPadding,
-  },
+  // The gap above already separates the sections, so a heading only needs to
+  // sit close to what it labels.
+  section: { marginBottom: -Spacing.sm },
+  sectionHint: { marginTop: -Spacing.sm },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   link: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    paddingHorizontal: Layout.screenPadding,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
   linkBody: { flex: 1, gap: 2 },
   linkText: { flex: 1 },
