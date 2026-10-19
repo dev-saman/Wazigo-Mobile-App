@@ -25,7 +25,8 @@ Laravel API; the app renders what the server allows and sends what the server ac
 | Area | State |
 | --- | --- |
 | Phase-1 screens | Built |
-| Tests | 286 passing across 38 suites |
+| The 2026-10-19 workbook | Built, except REP-06…09, ORG-15/16 (web-only) and LIVE-03 |
+| Tests | 362 passing across 43 suites |
 | Typecheck / lint | Clean |
 | Android device run | Done — development build on an emulator, against the live API |
 | iOS | **Never built or run.** Configured in `app.json` but unverified |
@@ -146,8 +147,8 @@ src/
 ```
 
 Features: `auth`, `bootstrap`, `cannedMessages`, `composer`, `connectivity`, `contactNotes`,
-`conversationAi`, `conversations`, `dashboard`, `followUps`, `messages`, `preferences`,
-`presence`, `push`, `realtime`, `support`, `templates`, `workspace`.
+`conversationAi`, `conversations`, `dashboard`, `followUps`, `messages`, `org`, `preferences`,
+`presence`, `push`, `realtime`, `report`, `support`, `templates`, `workspace`.
 
 ### Boundaries the linter enforces
 
@@ -185,15 +186,18 @@ src/app/
     _layout.tsx                        BootstrapGate + presence, realtime, push
     (tabs)/
       _layout.tsx                      two tabs: Home and Chats
-      index.tsx                        dashboard
-      chats.tsx                        conversation list
+      index.tsx                        Report overview (REP-01), replacing the dashboard
+      chats.tsx                        conversation list, with the brand / branch / number bar
     chats/[id]/
       index.tsx                        message thread, AI bar
       follow-ups.tsx                   follow-ups on this chat (CHAT-28…32)
       notes.tsx                        contact notes
       quick-replies.tsx                canned messages picker
       templates.tsx                    template picker + parameters
-    settings.tsx                       notifications, support, account
+    numbers/[id].tsx                   one number's day and action desk (REP-03, REP-04)
+    delivery-issues.tsx                why messages failed (REP-02)
+    locations.tsx                      brands, branches and number mapping (ORG-02…14)
+    settings.tsx                       notifications, support, workspace, account
 ```
 
 Group switching is by `Stack.Protected` guards on auth status, never by imperative navigation —
@@ -213,10 +217,10 @@ tabs: What's new 2026-10-19, Read me, Start here, Login, Agency Brand & Location
 Dashboard, Live updates, Push, Change-required status. It supersedes the older five-tab sheet of
 almost the same name, which is still live, still reads *last reviewed 15 Sep 2026*, and is stale.
 
-**The workbook moved on 19 Oct 2026.** The API layer has caught up, and so has the Chat area:
-per-number templates / labels / quick replies, brand / branch / number filtering and sort,
-CHAT-23 on a push tap, the AI bar and follow-ups. The two new areas — Agency / Brand / Location
-and Report — are not built. `docs/api-changes-2026-10-19.md` says exactly what is and is not.
+**The workbook moved on 19 Oct 2026, and the app has caught up.** All four areas are built:
+Login, Agency / Brand / Location, Chat and Report. What is deliberately left out — the number
+reports and CSV exports (REP-06 to REP-09), the two web-only ORG rows, and LIVE-03 — is listed
+in `docs/api-changes-2026-10-19.md`.
 
 **Success envelope:** `{status: true, message: "OK", data: ...}`, with `meta:
 {current_page, per_page, total, last_page}` on paged results. Inspect the HTTP status first.
@@ -477,7 +481,7 @@ Also outstanding, not blockers:
 
 ## 14. Testing
 
-`npm test` — 286 tests, 38 suites, no device and no network of its own.
+`npm test` — 362 tests, 43 suites, no device and no network of its own.
 
 - `src/api/__tests__/network.test.ts` drives the **real** network layer against a **local HTTP
   server**: concurrent 401s causing one refresh, proactive refresh, expiry without looping,

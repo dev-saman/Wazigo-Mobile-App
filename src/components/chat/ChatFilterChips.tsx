@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { AppText } from '@/components/common';
 import { Colors, Layout, Spacing } from '@/constants/theme';
-import { ChatFilters, type ChatFilter } from '@/features/conversations';
+import { ChatFilters, type ChatFilter } from '@/features/conversations/conversationsSlice';
 
 /**
  * Each chip is one CHAT-01 query, not a client-side filter. "Mine" is the

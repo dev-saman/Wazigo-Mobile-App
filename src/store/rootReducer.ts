@@ -12,7 +12,9 @@ import { labelsReducer } from '@/features/conversations/labelsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
 import { followUpsReducer } from '@/features/followUps/followUpsSlice';
 import { messagesReducer } from '@/features/messages/messagesSlice';
+import { orgReducer } from '@/features/org/orgSlice';
 import { realtimeReducer } from '@/features/realtime/realtimeSlice';
+import { reportReducer } from '@/features/report/reportSlice';
 import { templatesReducer } from '@/features/templates/templatesSlice';
 import { workspaceReducer } from '@/features/workspace/workspaceSlice';
 
@@ -32,7 +34,9 @@ const combined = combineReducers({
   followUps: followUpsReducer,
   labels: labelsReducer,
   messages: messagesReducer,
+  org: orgReducer,
   realtime: realtimeReducer,
+  report: reportReducer,
   templates: templatesReducer,
   workspace: workspaceReducer,
 });

@@ -5,7 +5,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ConversationSort } from '@/api/types';
 import { AppText, Sheet, SheetAction } from '@/components/common';
 import { Colors, Layout, Radius, Spacing } from '@/constants/theme';
-import { chatScopeLabel, type ChatScope, type ChatScopeOption } from '@/features/conversations';
+// The specific module, not the feature barrel: a presentational component has
+// no business pulling in thunks and device storage (and a pure test that
+// imports this barrel would then need an AsyncStorage mock).
+import {
+  chatScopeLabel,
+  type ChatScope,
+  type ChatScopeOption,
+} from '@/features/conversations/chatScope';
 
 const SORT_LABELS: Record<ConversationSort, string> = {
   newest: 'Newest first',

@@ -1,7 +1,8 @@
 import { Permissions } from '@/api/types';
 import { loadBootstrap } from '@/features/bootstrap/bootstrapThunks';
 import { loadConversations } from '@/features/conversations/conversationsThunks';
-import { loadDashboard, loadRecentConversations } from '@/features/dashboard/dashboardThunks';
+import { loadRecentConversations } from '@/features/dashboard/dashboardThunks';
+import { loadAccountOverview } from '@/features/report/reportThunks';
 import { loadThread } from '@/features/messages/messagesThunks';
 import { createAppAsyncThunk } from '@/store/hooks';
 
@@ -54,8 +55,10 @@ export const applyLiveBatch = createAppAsyncThunk<void, LiveBatch>(
       if (canViewConversations && current.conversations.loadedAt !== null) {
         void dispatch(loadConversations({ quiet: true, merge: true }));
       }
-      if (canViewDashboard && current.dashboard.overview) {
-        void dispatch(loadDashboard({ quiet: true }));
+      // REP-01 replaced the personal dashboard as the Home tab, so a live
+      // change refreshes the report figures, quietly.
+      if (canViewDashboard && current.report.overview) {
+        void dispatch(loadAccountOverview({ quiet: true }));
       }
       if (canViewConversations && current.dashboard.recent.status !== 'idle') {
         void dispatch(loadRecentConversations());

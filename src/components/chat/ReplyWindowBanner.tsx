@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { AppText, Button } from '@/components/common';
 import { Colors, Layout, Radius, Spacing } from '@/constants/theme';
-import { formatWindowRemaining, type ReplyWindow } from '@/features/conversations';
+import { formatWindowRemaining, type ReplyWindow } from '@/features/conversations/replyWindow';
 
 const Copy = {
   openTitle: 'Customer can reply',

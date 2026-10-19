@@ -38,6 +38,12 @@ export type ConversationsState = {
   scope: ChatScope;
   /** CHAT-01 (2026-10-19). `newest` is the server's own default. */
   sort: ConversationSort;
+  /**
+   * ORG-17: false until the choice saved on this phone has been read back.
+   * The list waits for it, so a restored brand is asked for once rather than
+   * the default list being fetched and then replaced.
+   */
+  scopeRestored: boolean;
   /** The term actually sent to the API (already debounced by the screen). */
   search: string;
   page: number;
@@ -54,6 +60,7 @@ const initialState: ConversationsState = {
   filter: 'mine',
   scope: ALL_CHATS,
   sort: 'newest',
+  scopeRestored: false,
   search: '',
   page: 0,
   lastPage: 1,
@@ -161,6 +168,14 @@ const conversationsSlice = createSlice({
       state.status = 'loading';
       state.error = null;
     },
+    /**
+     * ORG-17: what this phone had saved, applied before the first request.
+     * A missing or stale choice simply leaves the default in place.
+     */
+    scopeRestoredFromStorage(state, action: PayloadAction<ChatScope | null>) {
+      if (action.payload) state.scope = action.payload;
+      state.scopeRestored = true;
+    },
     /** CHAT-01 (2026-10-19). The server orders the list; the app never re-sorts. */
     sortChanged(state, action: PayloadAction<ConversationSort>) {
       if (state.sort === action.payload) return;
@@ -187,6 +202,7 @@ export const {
   filterChanged,
   searchChanged,
   scopeChanged,
+  scopeRestoredFromStorage,
   sortChanged,
 } = conversationsSlice.actions;
 

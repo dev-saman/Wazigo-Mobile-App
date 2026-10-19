@@ -29,14 +29,15 @@ import {
 import {
   ALL_CHATS,
   chatScopeOptions,
+  chooseChatScope,
   filterChanged,
   loadConversations,
   loadMoreConversations,
-  scopeChanged,
   searchChanged,
   selectChatFilter,
   selectChatQueryIsNarrowed,
   selectChatScope,
+  selectChatScopeRestored,
   selectChatSearch,
   selectChatSort,
   selectConversations,
@@ -46,6 +47,7 @@ import {
   selectConversationsStatus,
   selectConversationsTotal,
   selectHasMoreConversations,
+  restoreChatScope,
   scopeIsStale,
   sortChanged,
   type ChatFilter,
@@ -82,6 +84,7 @@ function ChatsScreen() {
   const total = useAppSelector(selectConversationsTotal);
   const narrowed = useAppSelector(selectChatQueryIsNarrowed);
   const scope = useAppSelector(selectChatScope);
+  const scopeRestored = useAppSelector(selectChatScopeRestored);
   const sort = useAppSelector(selectChatSort);
   const numbers = useAppSelector(selectNumbers);
   const businesses = useAppSelector(selectBusinesses);
@@ -105,18 +108,28 @@ function ChatsScreen() {
     return () => clearTimeout(timer);
   }, [dispatch, search, term]);
 
+  // ORG-17: put back what this phone was last showing, before the first
+  // request, so a restored brand is asked for once rather than the default
+  // list being fetched and immediately replaced.
+  useEffect(() => {
+    if (!scopeRestored) void dispatch(restoreChatScope());
+  }, [dispatch, scopeRestored]);
+
   // ORG-17: a brand, branch or number bootstrap has stopped listing is no
   // longer this person's to ask about - drop the choice rather than keep
   // sending an id the server will refuse.
   useEffect(() => {
-    if (scopeIsStale(scope, numbers, locations)) dispatch(scopeChanged(ALL_CHATS));
-  }, [dispatch, scope, numbers, locations]);
+    if (scopeRestored && scopeIsStale(scope, numbers, locations)) {
+      void dispatch(chooseChatScope(ALL_CHATS));
+    }
+  }, [dispatch, scope, scopeRestored, numbers, locations]);
 
   // Mount, and every time the query changes. In-flight requests are cancelled
   // by the thunk, so a slow first page cannot land on top of a newer one.
   useEffect(() => {
+    if (!scopeRestored) return;
     void dispatch(loadConversations());
-  }, [dispatch, filter, search, scope, sort]);
+  }, [dispatch, filter, search, scope, scopeRestored, sort]);
 
   const onRefresh = useCallback(() => {
     void dispatch(loadConversations({ refresh: true }));
@@ -143,7 +156,9 @@ function ChatsScreen() {
 
   const onScope = useCallback(
     (next: ChatScope) => {
-      dispatch(scopeChanged(next));
+      // ORG-17: changing it and remembering it are the same step, so the two
+      // can never drift apart.
+      void dispatch(chooseChatScope(next));
     },
     [dispatch],
   );

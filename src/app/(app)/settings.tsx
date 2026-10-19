@@ -3,10 +3,11 @@ import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { UpdatePreferencesPayload } from '@/api/types';
-import { AppText, Card, IconButton, Screen } from '@/components/common';
+import { AppText, Card, IconButton, Screen, SheetAction } from '@/components/common';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { selectCurrentUser } from '@/features/auth/authSelectors';
-import { selectSupport } from '@/features/bootstrap';
+import { Permissions } from '@/api/types';
+import { selectSupport, usePermission } from '@/features/bootstrap';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import { updateNotificationPreferences } from '@/features/preferences';
 import { SupportCard } from '@/features/support';
@@ -25,6 +26,9 @@ const Copy = {
   offline: 'You need an internet connection to change this.',
   failed: 'That change was not saved. Try again.',
   account: 'Account',
+  workspace: 'Workspace',
+  locations: 'Locations & numbers',
+  locationsHint: 'Brands, their branches, and which branches each number serves.',
 };
 
 /**
@@ -39,6 +43,7 @@ export default function SettingsScreen() {
   // Phase 4: re-read on every bootstrap, so a support number changed in the
   // back office reaches the app without an app update.
   const support = useAppSelector(selectSupport);
+  const canSeeStructure = usePermission(Permissions.locationsView);
 
   const [saving, setSaving] = useState<keyof UpdatePreferencesPayload | null>(null);
   const [failed, setFailed] = useState(false);
@@ -131,6 +136,24 @@ export default function SettingsScreen() {
           <AppText variant="caption" color="error">
             {Copy.failed}
           </AppText>
+        ) : null}
+
+        {/* ORG-02. Only for someone who may read the structure; an Agent is
+            refused there by design and has nothing to manage. */}
+        {canSeeStructure ? (
+          <>
+            <AppText variant="overline" color="textSecondary" style={styles.section}>
+              {Copy.workspace}
+            </AppText>
+            <Card>
+              <SheetAction
+                icon="business-outline"
+                label={Copy.locations}
+                description={Copy.locationsHint}
+                onPress={() => router.push('/locations')}
+              />
+            </Card>
+          </>
         ) : null}
 
         {/* Phase 4. Renders nothing at all until Wazigo has set a support

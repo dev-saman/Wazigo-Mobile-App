@@ -39,16 +39,34 @@ describes what the app implements today.
 - **Bootstrap** now keeps `account`, `businesses`, `locations` and the per-number brand, branch
   and colour fields, plus the LIVE-03 inbox channel name.
 
-**Not built:** the two new areas (§4), and LIVE-03 — no Brand or Location inbox view needs the
-personal inbox feed yet, and subscribing to it alongside the agent channel would only mean
-de-duplicating events for no gain.
+**The Agency / Brand / Location area (§4), end to end:** the brand switcher's selection is kept
+per person on the phone and cleared the moment bootstrap stops listing it (ORG-17), and
+Settings → *Locations & numbers* is the structure screen (ORG-02) with renaming, archiving and
+restoring brands (ORG-03, ORG-05, ORG-06), brand membership (ORG-07, ORG-08), branches (ORG-09
+to ORG-11), the number→branch mapping with its preview (ORG-12, ORG-13) and finishing a number
+that is waiting for a brand (ORG-14). An Agent is refused `/structure` by design, so the screen
+falls back to the names bootstrap already gave.
 
-Two deliberate gaps worth knowing about:
+**The Report area (§4):** Home is now REP-01 — snapshot and period figures for whatever brand or
+number is selected, which is the same selection Chats uses. *Why messages failed* is REP-02, and
+each number opens its own day (REP-03) and action desk (REP-04), where a row opens its chat
+through CHAT-23.
+
+**Not built:** REP-06 to REP-09 (number reports and the CSV exports — the download needs a native
+share path nobody has chosen), ORG-15 and ORG-16 (web-only by the workbook's own rule), and
+LIVE-03 — no Brand or Location inbox view needs the personal inbox feed yet, and subscribing to
+it alongside the agent channel would only mean de-duplicating events for no gain.
+
+Deliberate gaps worth knowing about:
 
 - **Follow-up times are a short list of choices** (in an hour, tomorrow morning, next week), not
   a date picker. Adding one is a native dependency decision nobody has made (REFERENCE.md §17).
-- **The brand/branch choice is not persisted.** ORG-17 wants it kept per account and user; that
-  belongs with the brand switcher, which is not built.
+- **The action desk offers one quick action**, *I have seen it*. Snooze, complete and cancel all
+  need words from the person (CHAT-32), so they stay on the chat's own follow-ups screen where
+  there is room to ask.
+- **The old `/crm/overview` dashboard screen is gone from the app.** REP-05 is still a valid
+  endpoint and `getDashboardOverview` is still in `apis.ts`, but no screen calls it: Home is
+  REP-01 now, and the live refresh follows it.
 
 The workbook now frames the app as four areas: **1 Login · 2 Agency, Brand & Location ·
 3 Chat · 4 Report**. Report replaces the personal Dashboard.

@@ -7,11 +7,14 @@ export {
   scopeChanged,
   sortChanged,
 } from './conversationsSlice';
+export { forgetStoredScope } from './scopeStorage';
 export {
   selectChatFilter,
   selectChatQueryIsNarrowed,
   selectChatScope,
+  selectChatScopeRestored,
   selectChatSort,
+  selectReportScopeParams,
   selectChatSearch,
   selectConversationById,
   selectConversations,
@@ -23,9 +26,11 @@ export {
   selectHasMoreConversations,
 } from './conversationsSelectors';
 export {
+  chooseChatScope,
   loadConversations,
   loadMoreConversations,
   markConversationRead,
+  restoreChatScope,
 } from './conversationsThunks';
 export {
   reopenConversation,

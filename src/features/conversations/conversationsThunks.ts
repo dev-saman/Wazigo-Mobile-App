@@ -4,12 +4,15 @@ import type { ConversationListParams, ConversationSort } from '@/api/types';
 import { threadConversationUpdated } from '@/features/messages/messagesSlice';
 import { createAppAsyncThunk } from '@/store/hooks';
 
-import { numberIdsForScope, type ChatScope } from './chatScope';
+import { numberIdsForScope, scopeIsStale, type ChatScope } from './chatScope';
+import { forgetStoredScope, loadStoredScope, saveStoredScope } from './scopeStorage';
 import {
   conversationPatched,
   conversationsFailed,
   conversationsLoaded,
   conversationsLoading,
+  scopeChanged,
+  scopeRestoredFromStorage,
   type ChatFilter,
   type LoadMode,
 } from './conversationsSlice';
@@ -188,5 +191,39 @@ export const markConversationRead = createAppAsyncThunk<void, { conversationId: 
       // Silent: failing to clear a badge must never interrupt reading a chat.
       return rejectWithValue(normalizeError(error));
     }
+  },
+);
+
+/**
+ * ORG-17. Puts back the brand, branch or number this phone was last showing.
+ *
+ * A choice bootstrap no longer lists is dropped rather than sent: access can
+ * have been taken away since, and asking about a number this person may not
+ * have is both wrong and pointless. The flag is set either way, because the
+ * list is waiting for it.
+ */
+export const restoreChatScope = createAppAsyncThunk<void, void>(
+  'conversations/restoreScope',
+  async (_, { dispatch, getState }) => {
+    const state = getState();
+    const userId = typeof state.auth.user?.id === 'number' ? state.auth.user.id : null;
+    const stored = await loadStoredScope(userId);
+
+    if (!stored || scopeIsStale(stored, state.bootstrap.numbers, state.bootstrap.locations)) {
+      if (stored) void forgetStoredScope();
+      dispatch(scopeRestoredFromStorage(null));
+      return;
+    }
+    dispatch(scopeRestoredFromStorage(stored));
+  },
+);
+
+/** ORG-17. The one way the scope changes, so it is always saved with it. */
+export const chooseChatScope = createAppAsyncThunk<void, ChatScope>(
+  'conversations/chooseScope',
+  async (scope, { dispatch, getState }) => {
+    dispatch(scopeChanged(scope));
+    const userId = typeof getState().auth.user?.id === 'number' ? getState().auth.user?.id : null;
+    await saveStoredScope(typeof userId === 'number' ? userId : null, scope);
   },
 );

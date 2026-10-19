@@ -10,6 +10,8 @@ const PREFIX = 'wazigo:';
 export const StorageKeys = {
   chatFilters: 'prefs:chat_filters',
   lastTab: 'prefs:last_tab',
+  /** ORG-17: the brand, branch or number the chat list is scoped to. */
+  chatScope: 'prefs:chat_scope',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];

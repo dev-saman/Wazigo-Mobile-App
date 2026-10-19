@@ -19,7 +19,7 @@ jest.mock('@/services/storage/tokenStorage', () => ({
 jest.mock('@/api/apis', () => ({
   getConversationMessages: jest.fn(),
   getConversations: jest.fn(),
-  getDashboardOverview: jest.fn(),
+  getAccountOverview: jest.fn(),
   getBootstrap: jest.fn(),
 }));
 
@@ -30,6 +30,7 @@ import { signedIn } from '@/features/auth/authSlice';
 import { bootstrapLoaded } from '@/features/bootstrap/bootstrapSlice';
 import { conversationsLoaded } from '@/features/conversations/conversationsSlice';
 import { threadLoaded } from '@/features/messages/messagesSlice';
+import { overviewLoaded } from '@/features/report/reportSlice';
 import { appReset } from '@/store/actions';
 import { store } from '@/store/store';
 
@@ -64,7 +65,7 @@ beforeEach(() => {
   store.dispatch(appReset());
   jest.mocked(api.getConversations).mockReset();
   jest.mocked(api.getConversationMessages).mockReset();
-  jest.mocked(api.getDashboardOverview).mockReset();
+  jest.mocked(api.getAccountOverview).mockReset();
 });
 
 it('does nothing for screens that have not loaded, and nothing when signed out', async () => {
@@ -75,7 +76,7 @@ it('does nothing for screens that have not loaded, and nothing when signed out',
 
   expect(api.getConversations).not.toHaveBeenCalled();
   expect(api.getConversationMessages).not.toHaveBeenCalled();
-  expect(api.getDashboardOverview).not.toHaveBeenCalled();
+  expect(api.getAccountOverview).not.toHaveBeenCalled();
 });
 
 it('puts the fresh first page on top of the pages the user already scrolled to', async () => {
@@ -127,9 +128,20 @@ it('refreshes only the open thread, keeping older history, and only when the bat
   expect(thread.page).toBe(2);
 });
 
-it('respects permissions: no dashboard call without dashboard.view', async () => {
+it('respects permissions: no report call without dashboard.view', async () => {
   signIn([Permissions.conversationsView]);
   store.dispatch(conversationsLoaded({ items: [conversation(1)], page: 1, lastPage: 1, total: 1, mode: 'initial' }));
+  // REP-01 is on screen, so the only thing holding the refresh back is the
+  // missing permission.
+  store.dispatch(
+    overviewLoaded({
+      as_of: '2026-10-19T10:00:00Z',
+      scope: { account_id: 1, workspace_ids: [], permitted_workspace_ids: [], partial_access: false },
+      period: { key: '30d', from: '2026-09-19', to: '2026-10-19', timezone: 'Asia/Kolkata', days: 30 },
+      snapshot_metrics: [],
+      period_metrics: [],
+    }),
+  );
   jest.mocked(api.getConversations).mockResolvedValue({
     data: [conversation(1)],
     meta: { current_page: 1, last_page: 1, per_page: 20, total: 1 },
@@ -140,7 +152,26 @@ it('respects permissions: no dashboard call without dashboard.view', async () =>
   await flush();
 
   expect(api.getConversations).toHaveBeenCalledTimes(1);
-  expect(api.getDashboardOverview).not.toHaveBeenCalled();
+  expect(api.getAccountOverview).not.toHaveBeenCalled();
+});
+
+it('refreshes the report quietly once it is on screen and allowed', async () => {
+  signIn();
+  store.dispatch(
+    overviewLoaded({
+      as_of: '2026-10-19T10:00:00Z',
+      scope: { account_id: 1, workspace_ids: [], permitted_workspace_ids: [], partial_access: false },
+      period: { key: '30d', from: '2026-09-19', to: '2026-10-19', timezone: 'Asia/Kolkata', days: 30 },
+      snapshot_metrics: [],
+      period_metrics: [],
+    }),
+  );
+  jest.mocked(api.getAccountOverview).mockResolvedValue({ data: null } as never);
+
+  await store.dispatch(applyLiveBatch({ conversationIds: [], assignedAwayIds: [], lists: true, everything: false, accessChanged: false }));
+  await flush();
+
+  expect(api.getAccountOverview).toHaveBeenCalledTimes(1);
 });
 
 describe('LIVE-04: the numbers or brands this person may see have changed', () => {

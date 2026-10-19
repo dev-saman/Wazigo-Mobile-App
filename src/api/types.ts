@@ -369,6 +369,18 @@ export const Permissions = {
   followUpsAssign: 'follow_ups.assign',
   /** CHAT-34 (2026-10-19). Marking what the AI could not answer. */
   knowledgeManage: 'knowledge.manage',
+  /** ORG-02 / ORG-04 (2026-10-19). Reading the brand and branch structure. */
+  locationsView: 'locations.view',
+  /** ORG-03, ORG-09 to ORG-11. Admin by default. */
+  locationsManage: 'locations.manage',
+  /** ORG-05, ORG-06. Agency accounts, account-wide Admin. */
+  businessesManage: 'businesses.manage',
+  /** ORG-08. */
+  businessesMembers: 'businesses.members',
+  /** ORG-12, ORG-13. Which branches a number serves. */
+  mappingManage: 'mapping.manage',
+  /** ORG-14. Finishing a number that is waiting for a brand. */
+  whatsappManage: 'whatsapp.manage',
 } as const;
 
 export type PermissionKey = (typeof Permissions)[keyof typeof Permissions];
