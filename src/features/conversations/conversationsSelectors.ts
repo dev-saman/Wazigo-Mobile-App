@@ -20,3 +20,7 @@ export const selectChatQueryIsNarrowed = (state: RootState) =>
 /** The listed row for a thread, used as the header until CHAT-02 meta arrives. */
 export const selectConversationById = (conversationId: string) => (state: RootState) =>
   state.conversations.items.find((item) => String(item.id) === String(conversationId)) ?? null;
+
+/** CHAT-01 (2026-10-19). Which brand, branch or number the list is asking about. */
+export const selectChatScope = (state: RootState) => state.conversations.scope;
+export const selectChatSort = (state: RootState) => state.conversations.sort;

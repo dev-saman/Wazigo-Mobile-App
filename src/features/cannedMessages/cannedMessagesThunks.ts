@@ -13,12 +13,18 @@ import {
  * pagination and no server-side search: the picker filters what is already
  * here, which also keeps typing responsive on a phone.
  */
-export const loadCannedMessages = createAppAsyncThunk<void, { refresh?: boolean } | void>(
+export const loadCannedMessages = createAppAsyncThunk<
+  void,
+  { refresh?: boolean; numberId?: number | null } | void
+>(
   'cannedMessages/load',
   async (arg, { dispatch, rejectWithValue }) => {
-    dispatch(cannedMessagesLoading({ refresh: !!(arg && arg.refresh) }));
+    const numberId = (arg && arg.numberId) ?? null;
+    dispatch(cannedMessagesLoading({ refresh: !!(arg && arg.refresh), numberId }));
     try {
-      const { data } = await api.getCannedMessages();
+      const { data } = await api.getCannedMessages(
+        numberId ? { whatsapp_account_id: numberId } : {},
+      );
       dispatch(cannedMessagesLoaded(Array.isArray(data) ? data : []));
     } catch (error) {
       const apiError = normalizeError(error);

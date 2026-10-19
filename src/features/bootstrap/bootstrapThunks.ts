@@ -1,6 +1,14 @@
 import * as api from '@/api/apis';
 import { normalizeError } from '@/api/network';
-import type { BootstrapPayload, RealtimeConfig, RoleName, WhatsAppNumber } from '@/api/types';
+import type {
+  AccountInfo,
+  BootstrapBusiness,
+  BootstrapLocation,
+  BootstrapPayload,
+  RealtimeConfig,
+  RoleName,
+  WhatsAppNumber,
+} from '@/api/types';
 import { userUpdated } from '@/features/auth/authSlice';
 import { toSupportContact } from '@/api/support';
 import { createAppAsyncThunk } from '@/store/hooks';
@@ -20,6 +28,38 @@ const toStringList = (values: unknown): string[] =>
 
 const toNumbers = (numbers: unknown): WhatsAppNumber[] =>
   Array.isArray(numbers) ? (numbers.filter((item) => item && typeof item === 'object') as WhatsAppNumber[]) : [];
+
+/**
+ * AUTH-05 (2026-10-19). `type` is narrowed because it decides the layout: only
+ * "agency" shows a brand switcher, and anything else - including a server that
+ * has never heard of brands - is the single-brand case.
+ */
+const toAccount = (value: unknown): AccountInfo | null => {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const type = raw.type === 'agency' || raw.type === 'business' ? raw.type : null;
+  return {
+    type,
+    classified: raw.classified === true,
+    admin_label: typeof raw.admin_label === 'string' ? raw.admin_label : null,
+    client_word: typeof raw.client_word === 'string' ? raw.client_word : null,
+  };
+};
+
+/** Brands and branches are shown as the server lists them, and never invented. */
+const toBusinesses = (value: unknown): BootstrapBusiness[] =>
+  Array.isArray(value)
+    ? (value.filter(
+        (item) => item && typeof item === 'object' && toId((item as { id?: unknown }).id) !== null,
+      ) as BootstrapBusiness[])
+    : [];
+
+const toLocations = (value: unknown): BootstrapLocation[] =>
+  Array.isArray(value)
+    ? (value.filter(
+        (item) => item && typeof item === 'object' && toId((item as { id?: unknown }).id) !== null,
+      ) as BootstrapLocation[])
+    : [];
 
 /** A positive integer id, whether the server sends it as a number or a string. */
 const toId = (value: unknown): number | null => {
@@ -53,6 +93,9 @@ const toRealtime = (value: unknown): RealtimeConfig | null => {
     auth_path: text(raw.auth_path) ?? '/api/v1/broadcasting/auth',
     channels: {
       agent: text(channels.agent),
+      // LIVE-03 (2026-10-19): the personal Inbox feed. Carried so a Brand or
+      // Location inbox can subscribe to it; My Chats needs only `agent`.
+      inbox: text(channels.inbox),
       numbers: Array.isArray(channels.numbers)
         ? channels.numbers.filter((name): name is string => typeof name === 'string' && name.trim() !== '')
         : null,
@@ -67,6 +110,9 @@ const select = (payload: BootstrapPayload | undefined): BootstrapData => ({
   permissions: toStringList(payload?.permissions),
   roles: toRoleNames(payload?.roles),
   numbers: toNumbers(payload?.numbers),
+  account: toAccount(payload?.account),
+  businesses: toBusinesses(payload?.businesses),
+  locations: toLocations(payload?.locations),
   tenantId: toId(payload?.settings?.tenant?.id),
   realtime: toRealtime(payload?.realtime),
   // Phase 4 is not published yet: an absent block reads as "nothing is set".

@@ -23,6 +23,8 @@ const Copy = {
   takeOver: 'Take over from the chatbot',
   takeOverHint: 'Stops the automated replies in this conversation.',
   labelsNone: 'None',
+  followUps: 'Follow-ups',
+  followUpsHint: 'Keep a promise to call or check back',
   notes: 'Notes',
   notesHint: 'Internal notes on this contact. The customer never sees them.',
 };
@@ -38,6 +40,10 @@ export type ConversationActionsSheetProps = {
   onTakeOver: () => void;
   /** CHAT-21/22. Omitted when the conversation carries no contact id. */
   onNotes?: () => void;
+  /** CHAT-28. Omitted where follow-ups are off for the workspace. */
+  onFollowUps?: () => void;
+  /** Open, acknowledged or snoozed - the ones still outstanding. */
+  openFollowUps?: number;
   /** `conversations.tag`; priority and labels are hidden without it. */
   canTag: boolean;
   busy?: boolean;
@@ -59,6 +65,8 @@ export function ConversationActionsSheet({
   onLabels,
   onTakeOver,
   onNotes,
+  onFollowUps,
+  openFollowUps = 0,
   canTag,
   busy = false,
   offline = false,
@@ -140,6 +148,21 @@ export function ConversationActionsSheet({
           label={Copy.notes}
           description={Copy.notesHint}
           onPress={onNotes}
+        />
+      ) : null}
+
+      {/* CHAT-28. The count is what the server last reported, not a guess from
+          what is on screen. */}
+      {onFollowUps ? (
+        <SheetAction
+          icon="alarm-outline"
+          label={Copy.followUps}
+          description={
+            openFollowUps > 0
+              ? `${openFollowUps} still open`
+              : Copy.followUpsHint
+          }
+          onPress={onFollowUps}
         />
       ) : null}
 

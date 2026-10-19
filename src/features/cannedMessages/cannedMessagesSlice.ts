@@ -9,19 +9,33 @@ export type CannedMessagesState = {
   items: CannedMessage[];
   status: CannedMessagesStatus;
   error: ApiError | null;
+  /**
+   * CHAT-20 (2026-10-19): quick replies belong to one number, so the cache
+   * does too - a chat on another number starts from an empty list.
+   */
+  numberId: number | null;
 };
 
 const initialState: CannedMessagesState = {
   items: [],
   status: 'idle',
   error: null,
+  numberId: null,
 };
 
 const cannedMessagesSlice = createSlice({
   name: 'cannedMessages',
   initialState,
   reducers: {
-    cannedMessagesLoading(state, action: PayloadAction<{ refresh: boolean }>) {
+    cannedMessagesLoading(
+      state,
+      action: PayloadAction<{ refresh: boolean; numberId?: number | null }>,
+    ) {
+      const numberId = action.payload.numberId ?? null;
+      if (numberId !== state.numberId) {
+        state.numberId = numberId;
+        state.items = [];
+      }
       state.status = action.payload.refresh ? 'refreshing' : 'loading';
       state.error = null;
     },

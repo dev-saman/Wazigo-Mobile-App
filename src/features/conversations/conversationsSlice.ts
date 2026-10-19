@@ -1,7 +1,9 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { ApiError, Conversation } from '@/api/types';
+import type { ApiError, Conversation, ConversationSort } from '@/api/types';
 import { appReset } from '@/store/actions';
+
+import { ALL_CHATS, type ChatScope } from './chatScope';
 
 /**
  * One chip = one server-side query. Every view except `unassigned` stays
@@ -28,6 +30,14 @@ export type ConversationsState = {
   status: ConversationsStatus;
   error: ApiError | null;
   filter: ChatFilter;
+  /**
+   * CHAT-01 (2026-10-19). Which brand, branch or number the list is asking
+   * about. Not persisted here: ORG-17 wants the choice kept per account and
+   * user, which belongs with the brand switcher rather than this slice.
+   */
+  scope: ChatScope;
+  /** CHAT-01 (2026-10-19). `newest` is the server's own default. */
+  sort: ConversationSort;
   /** The term actually sent to the API (already debounced by the screen). */
   search: string;
   page: number;
@@ -42,6 +52,8 @@ const initialState: ConversationsState = {
   status: 'idle',
   error: null,
   filter: 'mine',
+  scope: ALL_CHATS,
+  sort: 'newest',
   search: '',
   page: 0,
   lastPage: 1,
@@ -134,6 +146,33 @@ const conversationsSlice = createSlice({
       state.status = 'loading';
       state.error = null;
     },
+    /**
+     * CHAT-01 (2026-10-19). A different brand, branch or number is a different
+     * server query, so the rows below belong to the old one and go.
+     */
+    scopeChanged(state, action: PayloadAction<ChatScope>) {
+      if (state.scope.kind === action.payload.kind && state.scope.id === action.payload.id) return;
+      state.scope = action.payload;
+      state.items = [];
+      state.page = 0;
+      state.lastPage = 1;
+      state.total = 0;
+      state.loadedAt = null;
+      state.status = 'loading';
+      state.error = null;
+    },
+    /** CHAT-01 (2026-10-19). The server orders the list; the app never re-sorts. */
+    sortChanged(state, action: PayloadAction<ConversationSort>) {
+      if (state.sort === action.payload) return;
+      state.sort = action.payload;
+      state.items = [];
+      state.page = 0;
+      state.lastPage = 1;
+      state.total = 0;
+      state.loadedAt = null;
+      state.status = 'loading';
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(appReset, () => initialState);
@@ -147,6 +186,8 @@ export const {
   conversationPatched,
   filterChanged,
   searchChanged,
+  scopeChanged,
+  sortChanged,
 } = conversationsSlice.actions;
 
 export const conversationsReducer = conversationsSlice.reducer;

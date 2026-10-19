@@ -115,6 +115,16 @@ describe('signalFromEvent', () => {
     expect(signalFromEvent('presence.updated', { user_id: 5 })).toBeNull();
   });
 
+  it('LIVE-04: number.access_changed asks for a refresh and names no chat', () => {
+    // The payload is empty by contract: what this person may now see is only
+    // knowable from /me/bootstrap, so the event is a cue, never data.
+    expect(signalFromEvent('number.access_changed', {})).toEqual({
+      conversationId: null,
+      affectsLists: true,
+      accessChanged: true,
+    });
+  });
+
   it('reads a personal notification as a list change, with a conversation when its link names one', () => {
     expect(signalFromEvent(USER_NOTIFICATION_EVENT, { title: 'Chat assigned to you', link: '/inbox/77' })).toEqual({
       conversationId: 77,

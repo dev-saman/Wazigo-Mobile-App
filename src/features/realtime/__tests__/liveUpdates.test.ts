@@ -20,6 +20,7 @@ jest.mock('@/api/apis', () => ({
   getConversationMessages: jest.fn(),
   getConversations: jest.fn(),
   getDashboardOverview: jest.fn(),
+  getBootstrap: jest.fn(),
 }));
 
 import * as api from '@/api/apis';
@@ -49,6 +50,9 @@ const signIn = (permissions: string[] = [Permissions.conversationsView, Permissi
       permissions,
       roles: ['agent'],
       numbers: [],
+      account: null,
+      businesses: [],
+      locations: [],
       tenantId: 3,
       realtime: null,
       support: NO_SUPPORT,
@@ -64,9 +68,9 @@ beforeEach(() => {
 });
 
 it('does nothing for screens that have not loaded, and nothing when signed out', async () => {
-  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: true, everything: true }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: true, everything: true, accessChanged: false }));
   signIn();
-  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: true, everything: true }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: true, everything: true, accessChanged: false }));
   await flush();
 
   expect(api.getConversations).not.toHaveBeenCalled();
@@ -86,7 +90,7 @@ it('puts the fresh first page on top of the pages the user already scrolled to',
     httpStatus: 200,
   } as never);
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [9], assignedAwayIds: [], lists: true, everything: false }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [9], assignedAwayIds: [], lists: true, everything: false, accessChanged: false }));
   await flush();
 
   const { items, page, status } = store.getState().conversations;
@@ -112,11 +116,11 @@ it('refreshes only the open thread, keeping older history, and only when the bat
     httpStatus: 200,
   } as never);
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [7], assignedAwayIds: [], lists: false, everything: false }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [7], assignedAwayIds: [], lists: false, everything: false, accessChanged: false }));
   await flush();
   expect(api.getConversationMessages).not.toHaveBeenCalled();
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: false, everything: false }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [42], assignedAwayIds: [], lists: false, everything: false, accessChanged: false }));
   await flush();
   const thread = store.getState().messages.byConversation['42'];
   expect(thread.items.map((item) => item.id)).toEqual([21, 20, 19, 18, 17]);
@@ -132,9 +136,79 @@ it('respects permissions: no dashboard call without dashboard.view', async () =>
     httpStatus: 200,
   } as never);
 
-  await store.dispatch(applyLiveBatch({ conversationIds: [], assignedAwayIds: [], lists: true, everything: true }));
+  await store.dispatch(applyLiveBatch({ conversationIds: [], assignedAwayIds: [], lists: true, everything: true, accessChanged: false }));
   await flush();
 
   expect(api.getConversations).toHaveBeenCalledTimes(1);
   expect(api.getDashboardOverview).not.toHaveBeenCalled();
+});
+
+describe('LIVE-04: the numbers or brands this person may see have changed', () => {
+  it('reads bootstrap again before refreshing anything else', async () => {
+    signIn();
+    store.dispatch(
+      conversationsLoaded({
+        items: [conversation(42)],
+        page: 1,
+        lastPage: 1,
+        total: 1,
+        mode: 'initial',
+        merge: false,
+      }),
+    );
+
+    const order: string[] = [];
+    jest.mocked(api.getBootstrap).mockImplementation(async () => {
+      order.push('bootstrap');
+      return {
+        data: {
+          permissions: [Permissions.conversationsView],
+          roles: ['agent'],
+          numbers: [],
+        },
+      } as never;
+    });
+    jest.mocked(api.getConversations).mockImplementation(async () => {
+      order.push('conversations');
+      return { data: [], meta: { current_page: 1, per_page: 20, total: 0, last_page: 1 } } as never;
+    });
+
+    await store.dispatch(
+      applyLiveBatch({
+        conversationIds: [],
+        assignedAwayIds: [],
+        lists: false,
+        everything: false,
+        accessChanged: true,
+      }),
+    );
+    await flush();
+
+    // The event carries nothing, so bootstrap is the only source of truth for
+    // what this person may now see - and it has to answer first.
+    expect(order[0]).toBe('bootstrap');
+    expect(order).toContain('conversations');
+  });
+
+  it('keeps what is in hand when the re-read fails', async () => {
+    signIn();
+    jest.mocked(api.getBootstrap).mockRejectedValue({ code: 'TIMEOUT', message: 'slow' });
+    jest.mocked(api.getConversations).mockResolvedValue({
+      data: [],
+      meta: { current_page: 1, per_page: 20, total: 0, last_page: 1 },
+    } as never);
+
+    await store.dispatch(
+      applyLiveBatch({
+        conversationIds: [],
+        assignedAwayIds: [],
+        lists: false,
+        everything: false,
+        accessChanged: true,
+      }),
+    );
+    await flush();
+
+    expect(store.getState().bootstrap.permissions).toContain(Permissions.conversationsView);
+  });
 });

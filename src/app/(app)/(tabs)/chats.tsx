@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
-import { Permissions, type Conversation } from '@/api/types';
+import { Permissions, type Conversation, type ConversationSort } from '@/api/types';
 import { AppText, Screen } from '@/components/common';
 import {
   ChatFilterChips,
+  ChatScopeBar,
   ChatSearchField,
   ConversationRow,
   ConversationRowDivider as RowDivider,
@@ -18,15 +19,26 @@ import {
   StateView,
 } from '@/components/feedback';
 import { Colors, Layout, Spacing } from '@/constants/theme';
-import { RequirePermission } from '@/features/bootstrap';
 import {
+  RequirePermission,
+  selectBrandWord,
+  selectBusinesses,
+  selectLocations,
+  selectNumbers,
+} from '@/features/bootstrap';
+import {
+  ALL_CHATS,
+  chatScopeOptions,
   filterChanged,
   loadConversations,
   loadMoreConversations,
+  scopeChanged,
   searchChanged,
   selectChatFilter,
   selectChatQueryIsNarrowed,
+  selectChatScope,
   selectChatSearch,
+  selectChatSort,
   selectConversations,
   selectConversationsError,
   selectConversationsLoadedAt,
@@ -34,7 +46,10 @@ import {
   selectConversationsStatus,
   selectConversationsTotal,
   selectHasMoreConversations,
+  scopeIsStale,
+  sortChanged,
   type ChatFilter,
+  type ChatScope,
 } from '@/features/conversations';
 import { useLiveRefresh } from '@/features/realtime';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -66,6 +81,19 @@ function ChatsScreen() {
   const page = useAppSelector(selectConversationsPage);
   const total = useAppSelector(selectConversationsTotal);
   const narrowed = useAppSelector(selectChatQueryIsNarrowed);
+  const scope = useAppSelector(selectChatScope);
+  const sort = useAppSelector(selectChatSort);
+  const numbers = useAppSelector(selectNumbers);
+  const businesses = useAppSelector(selectBusinesses);
+  const locations = useAppSelector(selectLocations);
+  const brandWord = useAppSelector(selectBrandWord);
+
+  // ORG-01: the picker offers only what bootstrap listed, so a brand, branch or
+  // number the server has stopped sending simply stops being offered.
+  const scopeOptions = useMemo(
+    () => chatScopeOptions(numbers, businesses, locations),
+    [numbers, businesses, locations],
+  );
 
   const [term, setTerm] = useState(search);
 
@@ -77,11 +105,18 @@ function ChatsScreen() {
     return () => clearTimeout(timer);
   }, [dispatch, search, term]);
 
+  // ORG-17: a brand, branch or number bootstrap has stopped listing is no
+  // longer this person's to ask about - drop the choice rather than keep
+  // sending an id the server will refuse.
+  useEffect(() => {
+    if (scopeIsStale(scope, numbers, locations)) dispatch(scopeChanged(ALL_CHATS));
+  }, [dispatch, scope, numbers, locations]);
+
   // Mount, and every time the query changes. In-flight requests are cancelled
   // by the thunk, so a slow first page cannot land on top of a newer one.
   useEffect(() => {
     void dispatch(loadConversations());
-  }, [dispatch, filter, search]);
+  }, [dispatch, filter, search, scope, sort]);
 
   const onRefresh = useCallback(() => {
     void dispatch(loadConversations({ refresh: true }));
@@ -102,6 +137,20 @@ function ChatsScreen() {
   const onFilter = useCallback(
     (next: ChatFilter) => {
       dispatch(filterChanged(next));
+    },
+    [dispatch],
+  );
+
+  const onScope = useCallback(
+    (next: ChatScope) => {
+      dispatch(scopeChanged(next));
+    },
+    [dispatch],
+  );
+
+  const onSort = useCallback(
+    (next: ConversationSort) => {
+      dispatch(sortChanged(next));
     },
     [dispatch],
   );
@@ -134,6 +183,17 @@ function ChatsScreen() {
           {Copy.title}
         </AppText>
       </View>
+
+      {/* CHAT-01 (2026-10-19): both of these change the server query, not the
+          rows already on screen. */}
+      <ChatScopeBar
+        scope={scope}
+        options={scopeOptions}
+        onScopeChange={onScope}
+        sort={sort}
+        onSortChange={onSort}
+        brandWord={brandWord}
+      />
 
       <ChatSearchField value={term} onChangeText={setTerm} />
       {/* The count belongs to the query on screen, so it is hidden while a new

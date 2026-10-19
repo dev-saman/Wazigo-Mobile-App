@@ -24,7 +24,7 @@ import { TextField } from '@/components/forms';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { RequirePermission, usePermission } from '@/features/bootstrap';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
-import { sendTemplate } from '@/features/messages';
+import { selectThreadConversation, sendTemplate } from '@/features/messages';
 import {
   loadMoreTemplates,
   loadTemplates,
@@ -197,6 +197,11 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
   const error = useAppSelector(selectTemplatesError);
   const search = useAppSelector(selectTemplateSearch);
   const hasMore = useAppSelector(selectHasMoreTemplates);
+  const conversation = useAppSelector(selectThreadConversation(conversationId));
+  // CHAT-07 (2026-10-19): a template belongs to the chat's own number, and
+  // CHAT-08 answers 404 for any other. Null until the thread has loaded, which
+  // only means the first list is unfiltered and reloads once it arrives.
+  const numberId = conversation?.number?.id ?? null;
 
   const [term, setTerm] = useState(search);
   const [selected, setSelected] = useState<MessageTemplate | null>(null);
@@ -209,8 +214,8 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
   }, [dispatch, search, term]);
 
   useEffect(() => {
-    void dispatch(loadTemplates());
-  }, [dispatch, search]);
+    void dispatch(loadTemplates({ numberId }));
+  }, [dispatch, numberId, search]);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -247,7 +252,7 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
         <ErrorState
           error={error}
           title={Copy.failedTitle}
-          onRetry={() => void dispatch(loadTemplates())}
+          onRetry={() => void dispatch(loadTemplates({ numberId }))}
           retryAccessibilityLabel={Copy.retryLabel}
         />
       ) : (
@@ -274,7 +279,7 @@ function TemplatesScreen({ conversationId }: { conversationId: string }) {
             refreshControl={
               <RefreshControl
                 refreshing={status === 'refreshing'}
-                onRefresh={() => void dispatch(loadTemplates({ refresh: true }))}
+                onRefresh={() => void dispatch(loadTemplates({ refresh: true, numberId }))}
                 tintColor={Colors.primary}
                 colors={[Colors.primary]}
               />

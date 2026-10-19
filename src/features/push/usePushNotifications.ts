@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { AppState, Platform } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Alert, AppState, Platform } from 'react-native';
 
 import { selectCurrentUser } from '@/features/auth/authSelectors';
+import { checkChatBeforeOpening } from '@/features/messages';
 import { liveSignalBus } from '@/features/realtime/liveSignalBus';
 import { selectActiveConversationId } from '@/features/realtime/realtimeSlice';
 import {
@@ -15,17 +16,16 @@ import {
   type PushData,
 } from '@/services/push/pushNotifications';
 import { registerSessionCleanup } from '@/services/session/sessionCleanup';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 import { forgetPushToken, registerPushToken } from './pushRegistration';
 import { conversationIdFromPushData } from './pushTarget';
 
 const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
-const openConversation = (data: PushData) => {
-  const id = conversationIdFromPushData(data);
-  if (id) router.push({ pathname: '/chats/[id]', params: { id } });
-  else router.navigate('/chats');
+const Copy = {
+  goneTitle: 'This chat is no longer available',
+  goneBody: 'It may have been reassigned, or your access to its number has changed.',
 };
 
 /**
@@ -41,6 +41,7 @@ const openConversation = (data: PushData) => {
  * Unregistering happens in the sign-out thunk, before the session is revoked.
  */
 export function usePushNotifications() {
+  const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
   const activeConversationId = useAppSelector(selectActiveConversationId);
   const userId = typeof user?.id === 'number' ? user.id : null;
@@ -50,6 +51,31 @@ export function usePushNotifications() {
   useEffect(() => {
     activeRef.current = activeConversationId;
   }, [activeConversationId]);
+
+  /**
+   * CHAT-23: ask the server for the chat before opening it. The push was
+   * composed before delivery, and the person's access can have changed since -
+   * a 404 means this chat is not theirs to open any more, and nothing else is
+   * opened in its place.
+   */
+  const openConversation = useCallback(
+    async (data: PushData) => {
+      const id = conversationIdFromPushData(data);
+      if (!id) {
+        router.navigate('/chats');
+        return;
+      }
+      const outcome = await dispatch(checkChatBeforeOpening({ conversationId: id })).unwrap();
+      if (outcome === 'gone') {
+        Alert.alert(Copy.goneTitle, Copy.goneBody);
+        return;
+      }
+      // 'unknown' is a network or server problem, which says nothing about
+      // access: open the chat and let the thread report it where it belongs.
+      router.push({ pathname: '/chats/[id]', params: { id } });
+    },
+    [dispatch],
+  );
 
   useEffect(() => {
     setForegroundPresentation((data) => {
@@ -62,11 +88,11 @@ export function usePushNotifications() {
       if (id) liveSignalBus.emit({ conversationId: Number(id), affectsLists: true });
       else liveSignalBus.emitEverything();
     });
-    const stopOpened = onNotificationOpened(openConversation);
+    const stopOpened = onNotificationOpened((data) => void openConversation(data));
     const unregisterCleanup = registerSessionCleanup(forgetPushToken);
 
     void takeLaunchNotification().then((data) => {
-      if (data) openConversation(data);
+      if (data) void openConversation(data);
     });
 
     return () => {
@@ -76,7 +102,7 @@ export function usePushNotifications() {
       // Signed out: nothing may surface as a banner for the previous user.
       setForegroundPresentation(null);
     };
-  }, []);
+  }, [openConversation]);
 
   useEffect(() => {
     if (userId === null) return;

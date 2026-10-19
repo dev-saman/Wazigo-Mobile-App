@@ -9,6 +9,23 @@ export const selectBootstrapLoadedAt = (state: RootState) => state.bootstrap.loa
 export const selectPermissions = (state: RootState) => state.bootstrap.permissions;
 export const selectRoles = (state: RootState) => state.bootstrap.roles;
 export const selectNumbers = (state: RootState) => state.bootstrap.numbers;
+
+/** AUTH-05 (2026-10-19). */
+export const selectAccount = (state: RootState) => state.bootstrap.account;
+export const selectBusinesses = (state: RootState) => state.bootstrap.businesses;
+export const selectLocations = (state: RootState) => state.bootstrap.locations;
+
+/**
+ * ORG-01: only an agency account has several brands to switch between. A
+ * business account, an unclassified one, and a server that predates brands all
+ * show a single brand and no switcher.
+ */
+export const selectHasBrandSwitcher = (state: RootState) =>
+  state.bootstrap.account?.type === 'agency' && state.bootstrap.businesses.length > 1;
+
+/** What an agency calls a brand, e.g. "Client". Falls back to plain wording. */
+export const selectBrandWord = (state: RootState) =>
+  state.bootstrap.account?.client_word?.trim() || 'Brand';
 export const selectTenantId = (state: RootState) => state.bootstrap.tenantId;
 
 /**

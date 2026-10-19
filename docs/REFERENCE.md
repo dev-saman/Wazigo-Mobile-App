@@ -146,8 +146,8 @@ src/
 ```
 
 Features: `auth`, `bootstrap`, `cannedMessages`, `composer`, `connectivity`, `contactNotes`,
-`conversations`, `dashboard`, `messages`, `preferences`, `presence`, `push`, `realtime`,
-`support`, `templates`, `workspace`.
+`conversationAi`, `conversations`, `dashboard`, `followUps`, `messages`, `preferences`,
+`presence`, `push`, `realtime`, `support`, `templates`, `workspace`.
 
 ### Boundaries the linter enforces
 
@@ -188,7 +188,8 @@ src/app/
       index.tsx                        dashboard
       chats.tsx                        conversation list
     chats/[id]/
-      index.tsx                        message thread
+      index.tsx                        message thread, AI bar
+      follow-ups.tsx                   follow-ups on this chat (CHAT-28…32)
       notes.tsx                        contact notes
       quick-replies.tsx                canned messages picker
       templates.tsx                    template picker + parameters
@@ -206,6 +207,16 @@ reached from inside a conversation.
 ## 7. The API contract
 
 Base URL `https://app.wazigo.io/api/v1`. Bearer token on everything except the public paths.
+
+The contract is the Google Sheet **"Wazigo Mobile App — API Reference (2026-09-18)"** — eleven
+tabs: What's new 2026-10-19, Read me, Start here, Login, Agency Brand & Location, Chat, Report,
+Dashboard, Live updates, Push, Change-required status. It supersedes the older five-tab sheet of
+almost the same name, which is still live, still reads *last reviewed 15 Sep 2026*, and is stale.
+
+**The workbook moved on 19 Oct 2026.** The API layer has caught up, and so has the Chat area:
+per-number templates / labels / quick replies, brand / branch / number filtering and sort,
+CHAT-23 on a push tap, the AI bar and follow-ups. The two new areas — Agency / Brand / Location
+and Report — are not built. `docs/api-changes-2026-10-19.md` says exactly what is and is not.
 
 **Success envelope:** `{status: true, message: "OK", data: ...}`, with `meta:
 {current_page, per_page, total, last_page}` on paged results. Inspect the HTTP status first.
@@ -229,29 +240,42 @@ Base URL `https://app.wazigo.io/api/v1`. Bearer token on everything except the p
 | AUTH-11 | `PATCH /me/preferences` | `mute_notifications`, `mute_sound` (server-side mute) |
 | — | `POST` / `DELETE /me/devices` | Register / remove this phone's Expo push token |
 | DASH-01 | `GET /crm/overview` | Dashboard totals, priority split, activity, delivery |
-| CHAT-01 | `GET /conversations` | List; params `status, search, unread, assigned, label_id, priority, number_id, page, per_page` |
+| CHAT-01 | `GET /conversations` | List; params `status, search, unread, assigned, label_id, priority, number_id` **or** `number_ids[]`, `sort`, `page`, `per_page` |
 | CHAT-02 | `GET /conversations/{id}/messages` | Thread; `meta.conversation` carries the conversation |
 | CHAT-03 | `POST /conversations/{id}/messages` | Send text (`{type:'text', text}`) |
 | CHAT-04 | `POST /conversations/{id}/messages` | Send media — multipart, `type` + `file` (+ `caption`) |
 | CHAT-05 | `GET /conversations/{id}/messages/{msg}/media` | Authenticated media bytes |
 | CHAT-06 | `POST /conversations/{id}/read` | Mark read (**a write** — opening a thread performs it) |
-| CHAT-07 | `GET /templates` | `approved_only`, `search`, `category` |
+| CHAT-07 | `GET /templates` | `approved_only`, `search`, `category`, `whatsapp_account_id` |
 | CHAT-08 | `POST /conversations/{id}/template` | Send a template with header/body params |
 | CHAT-09 | `POST /conversations/{id}/messages/{msg}/retry` | Retry a failed send |
 | CHAT-10 / 11 | `POST .../resolve` / `.../reopen` | Close / reopen |
-| CHAT-13 | `GET /labels` | Label catalogue (read-only) |
-| CHAT-14 / 15 | `PUT .../labels`, `PUT .../priority` | Update labels / priority |
-| CHAT-16 / 17 | `PUT /me/presence`, `POST /me/presence/heartbeat` | Presence |
+| CHAT-13 | `GET /labels` | Label catalogue (read-only), per `whatsapp_account_id` |
+| CHAT-14 / 15 | `PUT .../labels`, `PATCH .../priority` | Update labels / priority |
+| CHAT-16 / 17 | `PATCH /me/presence`, `POST /me/presence/heartbeat` | Presence |
+| LIVE-03 / 04 | `realtime.channels.inbox` / `.user` | Inbox feed (not subscribed yet); `number.access_changed` |
 | CHAT-18 | `POST /conversations/{id}/chatbot/stop` | Take over from the bot |
-| CHAT-20 | `GET /canned-messages` | Quick replies (team + personal, unpaged) |
+| CHAT-20 | `GET /canned-messages` | Quick replies (team + personal, unpaged), per `whatsapp_account_id` |
+| CHAT-23 | `GET /conversations/{id}` | One chat by id, for a push tap. 404 = no longer available |
+| CHAT-24 / 25 / 26 | `GET .../ai`, `POST .../ai/pause`, `.../ai/resume` | AI status; take over and hand back |
+| CHAT-27 | `POST /conversations/{id}/location` | Which branch the chat is about |
+| CHAT-28 … 33 | `/conversations/{id}/follow-ups`, `/follow-ups/{id}…` | Follow-ups: list, owners, add, edit, state, history |
+| CHAT-34 | `POST /conversations/{id}/knowledge-gap` | "The AI could not answer this" |
+| ORG-02 … 14 | `/structure`, `/businesses…`, `/locations…`, `/workspaces/{n}/…` | Brands, locations, number mapping |
+| REP-01 … 09 | `/account/overview…`, `/whatsapp/numbers/{n}/…`, `/reports/…` | The Report area |
 | CHAT-21 / 22 | `GET` / `POST /contacts/{id}/notes` | Internal notes, max 2000 chars |
 | LIVE-01 | `POST /broadcasting/auth` | Private channel auth, under `/api/v1` |
 
 Public (no bearer): `/auth/otp/request`, `/auth/login`, `/auth/login/password`, `/auth/refresh`,
 `/auth/otp/notice`.
 
-**Not in the API, so not built:** assigning a conversation to someone, creating or editing
-labels, templates or canned messages, deleting conversations.
+**In the API, deliberately not built:** CHAT-12 `POST /conversations/{id}/assign` (hand a chat
+to someone else) and CHAT-19 `GET /users` (the roster that picker would need). Both are
+"reference only" in the workbook and outside phase-1 personal-chat scope; a default Agent does
+not even have `users.view`.
+
+**Not in the API, so not built:** creating or editing labels, templates or canned messages,
+deleting conversations.
 
 ---
 
@@ -299,8 +323,10 @@ Re-fetched quietly on foreground and on reconnect, once what is loaded is older 
 hand; a 403 or 401 is not transient and is handled as if it were the first load.
 
 Permission keys used: `conversations.view`, `conversations.send`, `conversations.tag`,
-`templates.view`, `templates.send`, `dashboard.view`. Use the returned permissions, never
-hardcoded role names.
+`templates.view`, `templates.send`, `dashboard.view`, and since 2026-10-19
+`conversations.set_location` (CHAT-27, not an Agent by default), `follow_ups.manage` and
+`follow_ups.assign` (CHAT-28…33), and `knowledge.manage` (CHAT-34). Use the returned
+permissions, never hardcoded role names.
 
 ---
 
@@ -439,8 +465,13 @@ Also outstanding, not blockers:
 
 - **No support WhatsApp number is set** in the back office (`chat_url: null`), so the "Chat with
   support" row is hidden on every device.
-- The API reference spreadsheet documents **none** of Phase 4 — not `data.support`, not the 403
-  body, and Phase 4 is absent from its "Change-required status" tab.
+- **The app is a workbook edition behind.** The 2026-10-19 update adds two app areas (Agency /
+  Brand / Location, and Report in place of the personal Dashboard), CHAT-23 to CHAT-34, a
+  reshaped bootstrap, LIVE-03 / LIVE-04 and a new push payload. None of it is built;
+  `docs/api-changes-2026-10-19.md` is the gap list. Its "Change-required status" tab confirms
+  blockers 1, 2 and 4 below are **still** open on 2026-10-19, and records 5 and 6 as done.
+- Phase 4 is in neither workbook: no `data.support` shape beyond a bootstrap key, and no 403
+  `workspace_unavailable` body.
 
 ---
 

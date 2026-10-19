@@ -1,12 +1,15 @@
+export { AiStatusBar } from './AiStatusBar';
 export { AttachmentSheet } from './AttachmentSheet';
 export { CannedReplyListItem } from './CannedReplyListItem';
 export { ChatFilterChips } from './ChatFilterChips';
 export { ConversationActionsSheet } from './ConversationActionsSheet';
+export { ChatScopeBar } from './ChatScopeBar';
 export { ChatSearchField } from './ChatSearchField';
 export { ContactNoteRow } from './ContactNoteRow';
 export { ConversationRow, ConversationRowDivider } from './ConversationRow';
 export { DaySeparator, dayLabel } from './DaySeparator';
 export { MediaAttachment } from './MediaAttachment';
+export { FollowUpRow } from './FollowUpRow';
 export { LabelsSheet } from './LabelsSheet';
 export { MessageActionsSheet } from './MessageActionsSheet';
 export { MessageBubble } from './MessageBubble';

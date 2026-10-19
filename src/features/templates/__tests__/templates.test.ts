@@ -61,6 +61,43 @@ describe('loadTemplates', () => {
     expect(store.getState().templates.items).toHaveLength(2);
   });
 
+  it('CHAT-07 (2026-10-19): asks for the chat own number, so another brand template is never offered', async () => {
+    await store.dispatch(loadTemplates({ numberId: 5 }));
+
+    expect(jest.mocked(api.getTemplates).mock.calls[0][0]).toMatchObject({
+      whatsapp_account_id: 5,
+    });
+  });
+
+  it('CHAT-07 (2026-10-19): opening a chat on another number drops the cached list', async () => {
+    jest.mocked(api.getTemplates).mockResolvedValue(page([template(1), template(2)], 1, 2));
+    await store.dispatch(loadTemplates({ numberId: 5 }));
+    expect(store.getState().templates.items).toHaveLength(2);
+
+    // A second number: the old templates must not be shown even for a moment,
+    // because CHAT-08 answers 404 for a template of another brand.
+    jest.mocked(api.getTemplates).mockResolvedValue(page([template(9)], 1, 1));
+    const pending = store.dispatch(loadTemplates({ numberId: 6 }));
+    expect(store.getState().templates.items).toEqual([]);
+    await pending;
+
+    expect(store.getState().templates.items.map((item) => item.id)).toEqual([9]);
+    expect(store.getState().templates.numberId).toBe(6);
+  });
+
+  it('keeps paging on the number it started on', async () => {
+    jest.mocked(api.getTemplates).mockResolvedValue(page([template(1)], 1, 2));
+    await store.dispatch(loadTemplates({ numberId: 5 }));
+
+    jest.mocked(api.getTemplates).mockResolvedValue(page([template(2)], 2, 2));
+    await store.dispatch(loadMoreTemplates());
+
+    expect(jest.mocked(api.getTemplates).mock.calls[1][0]).toMatchObject({
+      page: 2,
+      whatsapp_account_id: 5,
+    });
+  });
+
   it('sends the search term to the server', async () => {
     store.dispatch(templateSearchChanged('order'));
 

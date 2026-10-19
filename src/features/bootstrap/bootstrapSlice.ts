@@ -1,6 +1,15 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { ApiError, RealtimeConfig, RoleName, SupportContact, WhatsAppNumber } from '@/api/types';
+import type {
+  AccountInfo,
+  ApiError,
+  BootstrapBusiness,
+  BootstrapLocation,
+  RealtimeConfig,
+  RoleName,
+  SupportContact,
+  WhatsAppNumber,
+} from '@/api/types';
 import { NO_SUPPORT } from '@/api/support';
 import { appReset } from '@/store/actions';
 
@@ -20,6 +29,15 @@ export type BootstrapState = {
   permissions: string[];
   roles: RoleName[];
   numbers: WhatsAppNumber[];
+  /**
+   * AUTH-05 (2026-10-19). What kind of account this is, and the brands and
+   * branches it may see. `account` is null on a server that predates the brand
+   * work, and `account.type` null means nobody has grouped the numbers yet -
+   * both are "one brand, no switcher" as far as the app is concerned.
+   */
+  account: AccountInfo | null;
+  businesses: BootstrapBusiness[];
+  locations: BootstrapLocation[];
   /** `settings.tenant.id`. Legacy fallback for a server without `realtime`. */
   tenantId: number | null;
   /**
@@ -42,6 +60,9 @@ export type BootstrapData = {
   permissions: string[];
   roles: RoleName[];
   numbers: WhatsAppNumber[];
+  account: AccountInfo | null;
+  businesses: BootstrapBusiness[];
+  locations: BootstrapLocation[];
   tenantId: number | null;
   realtime: RealtimeConfig | null;
   support: SupportContact;
@@ -52,6 +73,9 @@ const initialState: BootstrapState = {
   permissions: [],
   roles: [],
   numbers: [],
+  account: null,
+  businesses: [],
+  locations: [],
   tenantId: null,
   realtime: null,
   support: NO_SUPPORT,
@@ -72,6 +96,9 @@ const bootstrapSlice = createSlice({
       state.permissions = action.payload.permissions;
       state.roles = action.payload.roles;
       state.numbers = action.payload.numbers;
+      state.account = action.payload.account;
+      state.businesses = action.payload.businesses;
+      state.locations = action.payload.locations;
       state.tenantId = action.payload.tenantId;
       state.realtime = action.payload.realtime;
       state.support = action.payload.support;

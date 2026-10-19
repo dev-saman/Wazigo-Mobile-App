@@ -1,4 +1,5 @@
 import { Permissions } from '@/api/types';
+import { loadBootstrap } from '@/features/bootstrap/bootstrapThunks';
 import { loadConversations } from '@/features/conversations/conversationsThunks';
 import { loadDashboard, loadRecentConversations } from '@/features/dashboard/dashboardThunks';
 import { loadThread } from '@/features/messages/messagesThunks';
@@ -29,23 +30,39 @@ export const applyLiveBatch = createAppAsyncThunk<void, LiveBatch>(
     const state = getState();
     if (state.auth.status !== 'authenticated') return;
 
-    const permissions = state.bootstrap.permissions;
+    // LIVE-04: numbers, brands or permissions changed. Read bootstrap before
+    // anything else, and from its answer - not the cached one - decide what may
+    // still be refreshed. The event carries no payload, so there is nothing to
+    // apply, only a reason to ask again.
+    if (batch.accessChanged) {
+      try {
+        await dispatch(loadBootstrap({ silent: true })).unwrap();
+      } catch {
+        // A failed re-fetch keeps what is in hand; the screens stay as they are
+        // and the next foreground or reconnect tries again.
+      }
+    }
+
+    // Read the store again: a LIVE-04 re-fetch above may have changed both the
+    // permissions and what is worth refreshing.
+    const current = getState();
+    const permissions = current.bootstrap.permissions;
     const canViewConversations = permissions.includes(Permissions.conversationsView);
     const canViewDashboard = permissions.includes(Permissions.dashboardView);
 
-    if (batch.lists || batch.everything) {
-      if (canViewConversations && state.conversations.loadedAt !== null) {
+    if (batch.lists || batch.everything || batch.accessChanged) {
+      if (canViewConversations && current.conversations.loadedAt !== null) {
         void dispatch(loadConversations({ quiet: true, merge: true }));
       }
-      if (canViewDashboard && state.dashboard.overview) {
+      if (canViewDashboard && current.dashboard.overview) {
         void dispatch(loadDashboard({ quiet: true }));
       }
-      if (canViewConversations && state.dashboard.recent.status !== 'idle') {
+      if (canViewConversations && current.dashboard.recent.status !== 'idle') {
         void dispatch(loadRecentConversations());
       }
     }
 
-    const active = state.realtime.activeConversationId;
+    const active = current.realtime.activeConversationId;
     if (!active || !canViewConversations) return;
 
     // LIVE-02: reassigned away from me. Refreshing the thread would only earn a
@@ -54,7 +71,7 @@ export const applyLiveBatch = createAppAsyncThunk<void, LiveBatch>(
       dispatch(conversationRevoked(active));
       return;
     }
-    const thread = state.messages.byConversation[active];
+    const thread = current.messages.byConversation[active];
     if (!thread || thread.loadedAt === null) return;
 
     const named = batch.conversationIds.some((id) => String(id) === active);

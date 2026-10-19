@@ -47,7 +47,11 @@ declare module 'axios' {
 }
 
 export type RequestOptions = {
-  params?: Record<string, string | number | boolean | undefined | null>;
+  /**
+   * Arrays are serialised by axios as `key[]=a&key[]=b`, which is the form the
+   * API asks for (`number_ids[]`, `numbers[]` - CHAT-01, REP-01, REP-07).
+   */
+  params?: Record<string, string | number | boolean | undefined | null | number[] | string[]>;
   headers?: Record<string, string>;
   requiresAuth?: boolean;
   skipAuthRefresh?: boolean;

@@ -6,9 +6,11 @@ import { cannedMessagesReducer } from '@/features/cannedMessages/cannedMessagesS
 import { composerReducer } from '@/features/composer/composerSlice';
 import { connectivityReducer } from '@/features/connectivity/connectivitySlice';
 import { contactNotesReducer } from '@/features/contactNotes/contactNotesSlice';
+import { conversationAiReducer } from '@/features/conversationAi/conversationAiSlice';
 import { conversationsReducer } from '@/features/conversations/conversationsSlice';
 import { labelsReducer } from '@/features/conversations/labelsSlice';
 import { dashboardReducer } from '@/features/dashboard/dashboardSlice';
+import { followUpsReducer } from '@/features/followUps/followUpsSlice';
 import { messagesReducer } from '@/features/messages/messagesSlice';
 import { realtimeReducer } from '@/features/realtime/realtimeSlice';
 import { templatesReducer } from '@/features/templates/templatesSlice';
@@ -24,8 +26,10 @@ const combined = combineReducers({
   composer: composerReducer,
   connectivity: connectivityReducer,
   contactNotes: contactNotesReducer,
+  conversationAi: conversationAiReducer,
   conversations: conversationsReducer,
   dashboard: dashboardReducer,
+  followUps: followUpsReducer,
   labels: labelsReducer,
   messages: messagesReducer,
   realtime: realtimeReducer,

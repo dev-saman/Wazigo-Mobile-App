@@ -21,6 +21,10 @@ const Copy = {
   retry: 'Try sending again',
   duplicate: 'The customer may receive this message twice.',
   fresh: 'This message never reached Wazigo, so it will be sent fresh.',
+  gap: 'The AI could not answer this',
+  gapHint: 'Adds a to-do in the Knowledge Hub. The customer sees nothing.',
+  gapMarked: 'Marked for the Knowledge Hub',
+  gapMarkedHint: 'Someone will add an answer on the web.',
   automated: 'Sent automatically by the chatbot',
   blocked: 'This message cannot be sent again.',
 };
@@ -31,6 +35,15 @@ export type MessageActionsSheetProps = {
   onClose: () => void;
   onRetry: (message: Message) => void;
   retrying?: boolean;
+  /**
+   * CHAT-34. Omitted unless the person has `knowledge.manage`. Offered only on
+   * a customer's own message: the gap is a question the AI could not answer,
+   * not something it said.
+   */
+  onKnowledgeGap?: (message: Message) => void;
+  markingGap?: boolean;
+  /** Already marked in this session, so the action says so instead of repeating. */
+  gapMarked?: boolean;
   /** Retry is a request like any other: offline it is refused, not queued. */
   offline?: boolean;
 };
@@ -46,6 +59,9 @@ export function MessageActionsSheet({
   onClose,
   onRetry,
   retrying = false,
+  onKnowledgeGap,
+  markingGap = false,
+  gapMarked = false,
   offline = false,
 }: MessageActionsSheetProps) {
   if (!message) return null;
@@ -112,6 +128,19 @@ export function MessageActionsSheet({
             {retry.blockedReason || Copy.blocked}
           </AppText>
         )
+      ) : null}
+
+      {/* CHAT-34. It only adds a to-do in the web Knowledge Hub - nothing
+          reaches the customer, and nothing the AI already said changes. */}
+      {onKnowledgeGap && message.direction === 'inbound' ? (
+        <SheetAction
+          icon="help-buoy-outline"
+          label={gapMarked ? Copy.gapMarked : Copy.gap}
+          description={gapMarked ? Copy.gapMarkedHint : Copy.gapHint}
+          busy={markingGap}
+          disabled={offline || gapMarked}
+          onPress={() => onKnowledgeGap(message)}
+        />
       ) : null}
     </Sheet>
   );

@@ -55,6 +55,13 @@ export const AGENT_CHANNEL_EVENTS = [
 /** Laravel's broadcast notification event on the personal channel. */
 export const USER_NOTIFICATION_EVENT = 'Illuminate\\Notifications\\Events\\BroadcastNotificationCreated';
 
+/**
+ * LIVE-04 (2026-10-19). Someone changed which numbers or brands this person may
+ * see. The payload is empty by design - what they may see now is only knowable
+ * from `/me/bootstrap`, so the event is a cue to re-fetch, never data.
+ */
+export const NUMBER_ACCESS_CHANGED_EVENT = 'number.access_changed';
+
 export type LiveSignal = {
   /** The conversation that changed, when the event names one. */
   conversationId: number | null;
@@ -69,6 +76,11 @@ export type LiveSignal = {
    * both the new assignee and the previous one, so "assigned" alone is ambiguous.
    */
   assignedAway?: boolean;
+  /**
+   * LIVE-04: this person's numbers or brands changed. Bootstrap has to be read
+   * again before anything on screen can be trusted.
+   */
+  accessChanged?: boolean;
 };
 
 const positiveId = (value: unknown): number | null => {
@@ -96,6 +108,10 @@ export function conversationIdFromLink(link: unknown): number | null {
  */
 export function signalFromEvent(eventName: string, payload: unknown, myUserId?: number | null): LiveSignal | null {
   const data = record(payload);
+
+  if (eventName === NUMBER_ACCESS_CHANGED_EVENT) {
+    return { conversationId: null, affectsLists: true, accessChanged: true };
+  }
 
   if (eventName === USER_NOTIFICATION_EVENT) {
     // Notifications carry no fixed conversation field; a link may name one.

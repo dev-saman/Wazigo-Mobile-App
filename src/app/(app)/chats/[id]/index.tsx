@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { normalizeError } from '@/api/network';
 import { Permissions, type ConversationPriority, type Message } from '@/api/types';
 import {
+  AiStatusBar,
   AttachmentSheet,
   ConversationActionsSheet,
   DaySeparator,
@@ -22,6 +23,16 @@ import { Screen } from '@/components/common';
 import { ErrorState, ListFooterLoader, StaleDataBanner, StateView } from '@/components/feedback';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { AccessDeniedView, RequirePermission, usePermission } from '@/features/bootstrap';
+import { loadFollowUps, selectOpenFollowUpCount } from '@/features/followUps';
+import {
+  loadConversationAi,
+  pauseConversationAi,
+  resumeConversationAi,
+  selectConversationAiBusy,
+  selectConversationAiStatus,
+  markKnowledgeGap,
+  setConversationLocation,
+} from '@/features/conversationAi';
 import { selectIsOffline } from '@/features/connectivity/connectivitySlice';
 import {
   loadLabels,
@@ -30,6 +41,7 @@ import {
   resolveConversation,
   selectConversationById,
   selectLabels,
+  selectLabelsNumberId,
   selectLabelsStatus,
   setConversationLabels,
   setConversationPriority,
@@ -99,8 +111,19 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   const canSendTemplates = usePermission(Permissions.templatesSend);
   const canUseTemplates = canViewTemplates && canSendTemplates;
   const canTag = usePermission(Permissions.conversationsTag);
+  const aiStatus = useAppSelector(selectConversationAiStatus(conversationId));
+  const aiBusy = useAppSelector(selectConversationAiBusy(conversationId));
+  const openFollowUps = useAppSelector(selectOpenFollowUpCount(conversationId));
+  const canSetLocation = usePermission(Permissions.conversationsSetLocation);
+  const canMarkGap = usePermission(Permissions.knowledgeManage);
+  // CHAT-34: which messages this session has already marked, so the sheet says
+  // so rather than offering the same thing twice. The server is idempotent, so
+  // losing this on a remount costs nothing.
+  const [markedGaps, setMarkedGaps] = useState<number[]>([]);
+  const [markingGap, setMarkingGap] = useState(false);
   const labels = useAppSelector(selectLabels);
   const labelsStatus = useAppSelector(selectLabelsStatus);
+  const labelsNumberId = useAppSelector(selectLabelsNumberId);
 
   // In the store, not local state: the quick-replies picker is a separate route
   // and writes into the draft while this screen is unmounted. See composerSlice.
@@ -123,6 +146,18 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
 
   useEffect(() => {
     void dispatch(loadThread({ conversationId }));
+  }, [conversationId, dispatch]);
+
+  // CHAT-24: the AI bar is extra context, so it is asked for separately and a
+  // failure never touches the thread itself.
+  useEffect(() => {
+    void dispatch(loadConversationAi({ conversationId }));
+  }, [conversationId, dispatch]);
+
+  // CHAT-28: the menu shows how many are still open, which means the list has
+  // to be read with the thread rather than only on the follow-ups screen.
+  useEffect(() => {
+    void dispatch(loadFollowUps({ conversationId }));
   }, [conversationId, dispatch]);
 
   // CHAT-06 only when there is a badge to clear: on opening, and again when a
@@ -164,6 +199,62 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
   }, [conversationId, dispatch, goBack, revokedConversationId]);
 
   // Inverted: reaching the "end" means the user scrolled up into older history.
+  const onPauseAi = useCallback(() => {
+    void dispatch(pauseConversationAi({ conversationId }));
+  }, [conversationId, dispatch]);
+
+  const onResumeAi = useCallback(() => {
+    void dispatch(resumeConversationAi({ conversationId }));
+  }, [conversationId, dispatch]);
+
+  /**
+   * CHAT-27. `location_version` goes back exactly as CHAT-24 gave it: a 409
+   * means a colleague chose first, and the thunk re-reads the status so the
+   * person is asked again against what is now true rather than overwriting it.
+   */
+  /**
+   * CHAT-34. A to-do for the web Knowledge Hub, nothing more: no customer sees
+   * it and no reply changes, so it goes straight through without a prompt.
+   */
+  const onKnowledgeGap = useCallback(
+    (message: Message) => {
+      traceWriteIntent('knowledge gap marked', { conversationId, messageId: message.id });
+      setMarkingGap(true);
+      void dispatch(markKnowledgeGap({ conversationId, payload: { message_id: message.id } }))
+        .unwrap()
+        .then(() => {
+          setMarkedGaps((marked) =>
+            marked.includes(message.id) ? marked : [...marked, message.id],
+          );
+        })
+        .catch((error) => {
+          Alert.alert(Copy.actionFailed, normalizeError(error).message);
+        })
+        .finally(() => setMarkingGap(false));
+    },
+    [conversationId, dispatch],
+  );
+
+  const onSetLocation = useCallback(
+    (locationId: number | null) => {
+      traceWriteIntent('chat branch chosen', { conversationId, locationId });
+      void dispatch(
+        setConversationLocation({
+          conversationId,
+          payload: {
+            location_id: locationId,
+            location_version: aiStatus?.location?.location_version ?? undefined,
+          },
+        }),
+      )
+        .unwrap()
+        .catch((error) => {
+          Alert.alert(Copy.actionFailed, normalizeError(error).message);
+        });
+    },
+    [aiStatus?.location?.location_version, conversationId, dispatch],
+  );
+
   const onEndReached = useCallback(() => {
     if (hasOlder) void dispatch(loadOlderMessages({ conversationId }));
   }, [conversationId, dispatch, hasOlder]);
@@ -336,6 +427,19 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
       {/* WhatsApp refuses free-form messages once the 24-hour window closes, so
           the composer is replaced by the template action rather than left to
           fail. No `conversations.send` permission means no composer at all. */}
+      {/* CHAT-24 to CHAT-26: whether the AI is answering this chat. Pause and
+          resume change what the customer is told next, so they need the same
+          permission as sending and only ever run from a tap. */}
+      <AiStatusBar
+        status={aiStatus}
+        busy={aiBusy}
+        onPause={canSend ? onPauseAi : undefined}
+        onResume={canSend ? onResumeAi : undefined}
+        onSetLocation={canSetLocation ? onSetLocation : undefined}
+        disabled={offline}
+        disabledReason={offline ? 'You are offline.' : undefined}
+      />
+
       {canSend ? (
         <>
           <ReplyWindowBanner
@@ -379,6 +483,9 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
         onClose={() => setActionMessage(null)}
         onRetry={onRetry}
         offline={offline}
+        onKnowledgeGap={canMarkGap ? onKnowledgeGap : undefined}
+        markingGap={markingGap}
+        gapMarked={!!actionMessage && markedGaps.includes(actionMessage.id)}
       />
 
       <ConversationActionsSheet
@@ -399,9 +506,19 @@ function ThreadScreen({ conversationId }: { conversationId: string }) {
               }
             : undefined
         }
+        onFollowUps={() => {
+          setOpenSheet('none');
+          router.push({ pathname: '/chats/[id]/follow-ups', params: { id: conversationId } });
+        }}
+        openFollowUps={openFollowUps}
         onPriority={() => setOpenSheet('priority')}
         onLabels={() => {
-          if (labelsStatus === 'idle' || labelsStatus === 'failed') void dispatch(loadLabels());
+          // CHAT-13 (2026-10-19): each number has its own labels, so a cache
+          // held for another number is reloaded, not reused.
+          const stale = labelsNumberId !== (thread?.number?.id ?? null);
+          if (labelsStatus === 'idle' || labelsStatus === 'failed' || stale) {
+            void dispatch(loadLabels({ numberId: thread?.number?.id ?? null }));
+          }
           setOpenSheet('labels');
         }}
       />

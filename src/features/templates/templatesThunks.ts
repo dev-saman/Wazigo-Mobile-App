@@ -10,12 +10,19 @@ const PER_PAGE = 20;
 /** One list request at a time: a new search term cancels the previous call. */
 let inFlight: AbortController | null = null;
 
-const fetchPage = async (search: string, page: number) => {
+const fetchPage = async (search: string, page: number, numberId: number | null) => {
   inFlight?.abort();
   const controller = new AbortController();
   inFlight = controller;
 
-  const params: TemplateListParams = { page, per_page: PER_PAGE, ...(search ? { search } : {}) };
+  const params: TemplateListParams = {
+    page,
+    per_page: PER_PAGE,
+    ...(search ? { search } : {}),
+    // CHAT-07 (2026-10-19): the chat's own number. Without it the server can
+    // return a template CHAT-08 then refuses with a 404.
+    ...(numberId ? { whatsapp_account_id: numberId } : {}),
+  };
 
   try {
     // CHAT-07: approved_only is applied by apis.getTemplates - an unapproved
@@ -26,16 +33,20 @@ const fetchPage = async (search: string, page: number) => {
   }
 };
 
-/** CHAT-07, page 1. */
-export const loadTemplates = createAppAsyncThunk<void, { refresh?: boolean } | void>(
+/** CHAT-07, page 1, for one number. */
+export const loadTemplates = createAppAsyncThunk<
+  void,
+  { refresh?: boolean; numberId?: number | null } | void
+>(
   'templates/load',
   async (arg, { dispatch, getState, rejectWithValue }) => {
     const { search } = getState().templates;
     const mode = arg && arg.refresh ? 'refresh' : 'initial';
-    dispatch(templatesLoading({ mode }));
+    const numberId = (arg && arg.numberId) ?? null;
+    dispatch(templatesLoading({ mode, numberId }));
 
     try {
-      const { data, meta } = await fetchPage(search, 1);
+      const { data, meta } = await fetchPage(search, 1, numberId);
       dispatch(
         templatesLoaded({
           items: Array.isArray(data) ? data : [],
@@ -57,12 +68,12 @@ export const loadTemplates = createAppAsyncThunk<void, { refresh?: boolean } | v
 export const loadMoreTemplates = createAppAsyncThunk<void, void>(
   'templates/loadMore',
   async (_, { dispatch, getState, rejectWithValue }) => {
-    const { search, page, lastPage, status } = getState().templates;
+    const { search, page, lastPage, status, numberId } = getState().templates;
     if (status !== 'ready' || page >= lastPage) return;
 
-    dispatch(templatesLoading({ mode: 'more' }));
+    dispatch(templatesLoading({ mode: 'more', numberId }));
     try {
-      const { data, meta } = await fetchPage(search, page + 1);
+      const { data, meta } = await fetchPage(search, page + 1, numberId);
       dispatch(
         templatesLoaded({
           items: Array.isArray(data) ? data : [],

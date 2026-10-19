@@ -18,6 +18,11 @@ export type LiveBatch = {
   lists: boolean;
   /** Catch-up after a reconnect or a poll: reload everything that is on screen. */
   everything: boolean;
+  /**
+   * LIVE-04: access changed, so `/me/bootstrap` is read again before the lists.
+   * Numbers, brands and permissions can all have moved underneath the screens.
+   */
+  accessChanged: boolean;
 };
 
 export const LIVE_BATCH_DELAY_MS = 750;
@@ -38,6 +43,7 @@ export function createLiveBatcher(
   let assignedAway = new Set<number>();
   let lists = false;
   let everything = false;
+  let accessChanged = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const flush = () => {
@@ -47,11 +53,13 @@ export function createLiveBatcher(
       assignedAwayIds: Array.from(assignedAway),
       lists,
       everything,
+      accessChanged,
     };
     ids = new Set();
     assignedAway = new Set();
     lists = false;
     everything = false;
+    accessChanged = false;
     onFlush(batch);
   };
 
@@ -66,6 +74,7 @@ export function createLiveBatcher(
       if (signal.conversationId !== null) ids.add(signal.conversationId);
       if (signal.assignedAway && signal.conversationId !== null) assignedAway.add(signal.conversationId);
       if (signal.affectsLists) lists = true;
+      if (signal.accessChanged) accessChanged = true;
       schedule();
     },
     pushEverything() {
@@ -80,6 +89,7 @@ export function createLiveBatcher(
       assignedAway = new Set();
       lists = false;
       everything = false;
+      accessChanged = false;
     },
   };
 }

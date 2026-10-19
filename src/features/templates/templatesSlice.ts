@@ -14,6 +14,12 @@ export type TemplatesState = {
   page: number;
   lastPage: number;
   total: number;
+  /**
+   * CHAT-07 (2026-10-19): templates belong to one number, so the cache does
+   * too. Opening a chat on a different number throws the old list away rather
+   * than offering templates that number may not send.
+   */
+  numberId: number | null;
 };
 
 const initialState: TemplatesState = {
@@ -24,6 +30,7 @@ const initialState: TemplatesState = {
   page: 0,
   lastPage: 1,
   total: 0,
+  numberId: null,
 };
 
 const mergeById = (existing: MessageTemplate[], incoming: MessageTemplate[]): MessageTemplate[] => {
@@ -35,8 +42,19 @@ const templatesSlice = createSlice({
   name: 'templates',
   initialState,
   reducers: {
-    templatesLoading(state, action: PayloadAction<{ mode: 'initial' | 'refresh' | 'more' }>) {
+    templatesLoading(
+      state,
+      action: PayloadAction<{ mode: 'initial' | 'refresh' | 'more'; numberId?: number | null }>,
+    ) {
       const { mode } = action.payload;
+      const numberId = action.payload.numberId ?? null;
+      if (numberId !== state.numberId) {
+        state.numberId = numberId;
+        state.items = [];
+        state.page = 0;
+        state.lastPage = 1;
+        state.total = 0;
+      }
       state.status = mode === 'refresh' ? 'refreshing' : mode === 'more' ? 'loadingMore' : 'loading';
       state.error = null;
     },

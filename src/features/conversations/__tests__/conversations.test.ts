@@ -22,7 +22,9 @@ import type { ApiError, Conversation } from '@/api/types';
 import { appReset } from '@/store/actions';
 import { store } from '@/store/store';
 
-import { filterChanged, searchChanged } from '../conversationsSlice';
+import { bootstrapLoaded } from '@/features/bootstrap/bootstrapSlice';
+
+import { filterChanged, scopeChanged, searchChanged, sortChanged } from '../conversationsSlice';
 import { loadConversations, loadMoreConversations } from '../conversationsThunks';
 
 const row = (id: number): Conversation =>
@@ -188,5 +190,88 @@ describe('the quiet refresh behind the live fallback', () => {
     expect(state.items).toHaveLength(2);
     expect(state.status).toBe('ready');
     expect(state.error?.code).toBe('OFFLINE');
+  });
+});
+
+describe('CHAT-01 (2026-10-19): brand, branch and number', () => {
+  // Brand 1 has two numbers, one of which also serves the whole brand.
+  const bootstrap = {
+    permissions: [],
+    roles: [],
+    numbers: [
+      { id: 5, display_phone_number: '+919000000005', business_id: 1, location_ids: [10] },
+      { id: 6, display_phone_number: '+919000000006', business_id: 1, location_ids: [], business_wide: true },
+      { id: 7, display_phone_number: '+919000000007', business_id: 2, location_ids: [12] },
+    ],
+    account: { type: 'agency' as const },
+    businesses: [
+      { id: 1, name: 'Riders Rally' },
+      { id: 2, name: 'Sunrise Dental' },
+    ],
+    locations: [
+      { id: 10, business_id: 1, name: 'Pune' },
+      { id: 12, business_id: 2, name: 'Surat' },
+    ],
+    tenantId: 1,
+    realtime: null,
+    support: { email: null, chat_url: null },
+  };
+
+  beforeEach(() => {
+    store.dispatch(bootstrapLoaded(bootstrap as never));
+  });
+
+  it('sends one number as number_id, never as a list', async () => {
+    store.dispatch(scopeChanged({ kind: 'number', id: 5 }));
+    await store.dispatch(loadConversations());
+
+    expect(paramsOf()).toMatchObject({ number_id: 5 });
+    expect(paramsOf()).not.toHaveProperty('number_ids');
+  });
+
+  it('sends a brand as number_ids, never alongside number_id', async () => {
+    store.dispatch(scopeChanged({ kind: 'brand', id: 1 }));
+    await store.dispatch(loadConversations());
+
+    expect(paramsOf()).toMatchObject({ number_ids: [5, 6] });
+    expect(paramsOf()).not.toHaveProperty('number_id');
+  });
+
+  it('a branch includes the numbers that serve its whole brand', async () => {
+    store.dispatch(scopeChanged({ kind: 'location', id: 10 }));
+    await store.dispatch(loadConversations());
+
+    expect(paramsOf()).toMatchObject({ number_ids: [5, 6] });
+  });
+
+  it('a scope that covers nothing shows an empty list rather than asking for everything', async () => {
+    store.dispatch(bootstrapLoaded({ ...bootstrap, numbers: [] } as never));
+    store.dispatch(scopeChanged({ kind: 'location', id: 10 }));
+    await store.dispatch(loadConversations());
+
+    // An empty `number_ids` would read as "no filter" on the server.
+    expect(jest.mocked(api.getConversations)).not.toHaveBeenCalled();
+    expect(store.getState().conversations.items).toEqual([]);
+    expect(store.getState().conversations.total).toBe(0);
+  });
+
+  it('only sends sort when it is not the server default', async () => {
+    await store.dispatch(loadConversations());
+    expect(paramsOf()).not.toHaveProperty('sort');
+
+    store.dispatch(sortChanged('oldest_waiting'));
+    await store.dispatch(loadConversations());
+    expect(paramsOf(1)).toMatchObject({ sort: 'oldest_waiting' });
+  });
+
+  it('keeps the scope while paging', async () => {
+    jest.mocked(api.getConversations).mockResolvedValue(page([row(1)], 1, 2));
+    store.dispatch(scopeChanged({ kind: 'number', id: 5 }));
+    await store.dispatch(loadConversations());
+
+    jest.mocked(api.getConversations).mockResolvedValue(page([row(2)], 2, 2));
+    await store.dispatch(loadMoreConversations());
+
+    expect(paramsOf(1)).toMatchObject({ number_id: 5, page: 2 });
   });
 });

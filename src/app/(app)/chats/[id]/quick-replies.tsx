@@ -45,12 +45,14 @@ function QuickRepliesScreen({ conversationId }: { conversationId: string }) {
   const status = useAppSelector(selectCannedMessagesStatus);
   const error = useAppSelector(selectCannedMessagesError);
   const conversation = useAppSelector(selectThreadConversation(conversationId));
+  // CHAT-20 (2026-10-19): quick replies belong to the chat's own number.
+  const numberId = conversation?.number?.id ?? null;
 
   const [term, setTerm] = useState('');
 
   useEffect(() => {
-    void dispatch(loadCannedMessages());
-  }, [dispatch]);
+    void dispatch(loadCannedMessages({ numberId }));
+  }, [dispatch, numberId]);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -102,7 +104,7 @@ function QuickRepliesScreen({ conversationId }: { conversationId: string }) {
         <ErrorState
           error={error}
           title={Copy.failedTitle}
-          onRetry={() => void dispatch(loadCannedMessages())}
+          onRetry={() => void dispatch(loadCannedMessages({ numberId }))}
           retryAccessibilityLabel={Copy.retryLabel}
         />
       ) : (
@@ -129,7 +131,7 @@ function QuickRepliesScreen({ conversationId }: { conversationId: string }) {
             refreshControl={
               <RefreshControl
                 refreshing={status === 'refreshing'}
-                onRefresh={() => void dispatch(loadCannedMessages({ refresh: true }))}
+                onRefresh={() => void dispatch(loadCannedMessages({ refresh: true, numberId }))}
                 tintColor={Colors.primary}
                 colors={[Colors.primary]}
               />

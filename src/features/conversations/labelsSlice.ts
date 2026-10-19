@@ -11,15 +11,26 @@ export type LabelsState = {
   items: Label[];
   status: 'idle' | 'loading' | 'ready' | 'failed';
   error: ApiError | null;
+  /**
+   * CHAT-13 (2026-10-19): each number has its own labels, so the cache is per
+   * number and a chat on another number reloads instead of showing the wrong
+   * catalogue.
+   */
+  numberId: number | null;
 };
 
-const initialState: LabelsState = { items: [], status: 'idle', error: null };
+const initialState: LabelsState = { items: [], status: 'idle', error: null, numberId: null };
 
 const labelsSlice = createSlice({
   name: 'labels',
   initialState,
   reducers: {
-    labelsLoading(state) {
+    labelsLoading(state, action: PayloadAction<{ numberId?: number | null } | undefined>) {
+      const numberId = action.payload?.numberId ?? null;
+      if (numberId !== state.numberId) {
+        state.numberId = numberId;
+        state.items = [];
+      }
       state.status = 'loading';
       state.error = null;
     },
@@ -41,13 +52,14 @@ const labelsSlice = createSlice({
 export const { labelsLoading, labelsLoaded, labelsFailed } = labelsSlice.actions;
 export const labelsReducer = labelsSlice.reducer;
 
-/** CHAT-13. The whole list is small, so it is fetched once per session. */
-export const loadLabels = createAppAsyncThunk<void, void>(
+/** CHAT-13. Small enough to fetch once per number per session. */
+export const loadLabels = createAppAsyncThunk<void, { numberId?: number | null } | void>(
   'labels/load',
-  async (_, { dispatch, rejectWithValue }) => {
-    dispatch(labelsLoading());
+  async (arg, { dispatch, rejectWithValue }) => {
+    const numberId = (arg && arg.numberId) ?? null;
+    dispatch(labelsLoading({ numberId }));
     try {
-      const { data } = await api.getLabels();
+      const { data } = await api.getLabels(numberId ? { whatsapp_account_id: numberId } : {});
       dispatch(labelsLoaded(Array.isArray(data) ? data : []));
     } catch (error) {
       const apiError = normalizeError(error);
@@ -59,3 +71,5 @@ export const loadLabels = createAppAsyncThunk<void, void>(
 
 export const selectLabels = (state: RootState) => state.labels.items;
 export const selectLabelsStatus = (state: RootState) => state.labels.status;
+/** Which number the cached catalogue belongs to (CHAT-13, 2026-10-19). */
+export const selectLabelsNumberId = (state: RootState) => state.labels.numberId;

@@ -1,12 +1,17 @@
 export { bootstrapReducer } from './bootstrapSlice';
 export {
+  selectAccount,
   selectBootstrapError,
   selectBootstrapLoadedAt,
   selectBootstrapReady,
   selectBootstrapStatus,
+  selectBrandWord,
+  selectBusinesses,
   selectHasAnyPermission,
+  selectHasBrandSwitcher,
   selectHasPermission,
   selectHasRole,
+  selectLocations,
   selectNumbers,
   selectPermissions,
   selectPrimaryNumber,

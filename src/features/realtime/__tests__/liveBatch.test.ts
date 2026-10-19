@@ -19,6 +19,7 @@ it('answers a burst of events with one refresh', () => {
     assignedAwayIds: [],
     lists: true,
     everything: false,
+    accessChanged: false,
   });
 });
 
@@ -45,6 +46,7 @@ it('a delivery tick alone does not reload lists', () => {
     assignedAwayIds: [],
     lists: false,
     everything: false,
+    accessChanged: false,
   });
 });
 
@@ -58,6 +60,7 @@ it('a catch-up asks for everything on screen', () => {
     assignedAwayIds: [],
     lists: true,
     everything: true,
+    accessChanged: false,
   });
 });
 
@@ -77,4 +80,24 @@ it('cancel drops what was pending', () => {
   batcher.cancel();
   jest.runAllTimers();
   expect(flush).not.toHaveBeenCalled();
+});
+
+it('LIVE-04: an access change is carried so bootstrap can be read again', () => {
+  const flush = jest.fn();
+  const batcher = createLiveBatcher(flush);
+  batcher.push({ conversationId: null, affectsLists: true, accessChanged: true });
+  jest.runAllTimers();
+  expect(flush.mock.calls[0][0].accessChanged).toBe(true);
+  // The event names no chat, so nothing is refreshed by id.
+  expect(flush.mock.calls[0][0].conversationIds).toEqual([]);
+});
+
+it('a later batch does not inherit the previous access change', () => {
+  const flush = jest.fn();
+  const batcher = createLiveBatcher(flush);
+  batcher.push({ conversationId: null, affectsLists: true, accessChanged: true });
+  jest.runAllTimers();
+  batcher.push({ conversationId: 5, affectsLists: true });
+  jest.runAllTimers();
+  expect(flush.mock.calls[1][0].accessChanged).toBe(false);
 });
