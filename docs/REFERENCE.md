@@ -28,7 +28,7 @@ Laravel API; the app renders what the server allows and sends what the server ac
 | The 2026-10-19 workbook | Built, except REP-06…09, ORG-15/16 (web-only) and LIVE-03 |
 | Tests | 362 passing across 43 suites |
 | Typecheck / lint | Clean |
-| Android device run | Done — development build on an emulator, against the live API |
+| Android device run | Done — development build on an emulator, against the live API. Report (REP-01…04), delivery issues and Locations & numbers (ORG-02) all checked there on 2026-10-19; no write was fired |
 | iOS | **Never built or run.** Configured in `app.json` but unverified |
 | Backend blockers | 3 of 6 fixed; 3 still open (§13) |
 | Support chat (Phase 4) | Built, partly verified (§11) |
